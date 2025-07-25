@@ -8,9 +8,7 @@ import {
 
 export interface SolverProgress {
     iteration: number;
-    currentFitness: number;
-    bestFitness: number;
-    improvement?: number;
+    fitness: number;
     isComplete?: boolean;
 }
 
@@ -145,8 +143,7 @@ export class SolverService {
             // Report initial progress
             this.progressSignal.set({
                 iteration: generation,
-                currentFitness: bestFitness,
-                bestFitness: bestFitness,
+                fitness: bestFitness,
                 isComplete: false
             });
 
@@ -171,8 +168,7 @@ export class SolverService {
                 // Report progress after each generation
                 this.progressSignal.set({
                     iteration: generation + 1,
-                    currentFitness: currentBest.fitness,
-                    bestFitness: bestFitness,
+                    fitness: bestFitness,
                     isComplete: false
                 });
 
@@ -234,8 +230,7 @@ export class SolverService {
 
             this.progressSignal.set({
                 iteration: generation,
-                currentFitness: bestFitness,
-                bestFitness: bestFitness,
+                fitness: bestFitness,
                 isComplete: true
             });
 
@@ -330,8 +325,7 @@ export class SolverService {
             // Report initial progress
             this.progressSignal.set({
                 iteration: 0,
-                currentFitness: bestFitnessFound,
-                bestFitness: bestFitnessFound,
+                fitness: bestFitnessFound,
                 isComplete: false
             });
 
@@ -350,13 +344,14 @@ export class SolverService {
 
                         this.progressSignal.set({
                             iteration: iter,
-                            currentFitness: fitness,
-                            bestFitness: bestFitnessFound,
+                            fitness: bestFitnessFound,
                             isComplete: false
                         });
                     }
                 }
-            ); const endTime = performance.now();
+            );
+
+            const endTime = performance.now();
             const executionTime = endTime - startTime;
 
             const solverResult: SolverResult = {
@@ -368,8 +363,7 @@ export class SolverService {
 
             this.progressSignal.set({
                 iteration: result.iterations,
-                currentFitness: result.fitness,
-                bestFitness: Math.max(bestFitnessFound, result.fitness),
+                fitness: Math.max(bestFitnessFound, result.fitness),
                 isComplete: true
             });
 
@@ -515,8 +509,7 @@ export class SolverService {
                         iteration = iter;
                         this.progressSignal.set({
                             iteration,
-                            currentFitness: -fitness, // Convert back to positive distance
-                            bestFitness: -fitness,
+                            fitness: -fitness, // Convert back to positive distance
                             isComplete: false
                         });
                     }
@@ -540,8 +533,7 @@ export class SolverService {
 
             this.progressSignal.set({
                 iteration: bestResult.iterations,
-                currentFitness: -bestResult.fitness,
-                bestFitness: -bestResult.fitness,
+                fitness: -bestResult.fitness,
                 isComplete: true
             });
 
@@ -586,8 +578,7 @@ export class SolverService {
                         iteration = iter;
                         this.progressSignal.set({
                             iteration,
-                            currentFitness: -fitness, // Convert back to positive distance
-                            bestFitness: -fitness,
+                            fitness: -fitness, // Convert back to positive distance
                             isComplete: false
                         });
                     }
@@ -606,8 +597,7 @@ export class SolverService {
 
             this.progressSignal.set({
                 iteration: result.iterations,
-                currentFitness: -result.fitness,
-                bestFitness: -result.fitness,
+                fitness: -result.fitness,
                 isComplete: true
             });
 

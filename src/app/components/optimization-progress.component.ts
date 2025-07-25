@@ -22,7 +22,7 @@ export type ProgressType = 'sudoku' | 'tsp';
             </div>
             <div class="stat">
               <label>{{ progressType === 'sudoku' ? 'Fitness' : 'Best Distance' }}:</label>
-              <span>{{ getDisplayValue(progress.bestFitness) }}</span>
+              <span>{{ getDisplayValue(progress.fitness) }}</span>
             </div>
             @if (progressType === 'tsp' && improvement() > 0) {
               <div class="stat improvement">
@@ -212,7 +212,7 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
 
   private calculateImprovement(progress: SolverProgress) {
     if (this.progressType === 'tsp' && this.initialValue) {
-      const currentValue = -progress.bestFitness; // TSP fitness is negative distance
+      const currentValue = -progress.fitness; // TSP fitness is negative distance
       const improvementPercent = ((this.initialValue - currentValue) / this.initialValue) * 100;
       this.improvement.set(Math.max(0, improvementPercent));
     }
@@ -220,8 +220,8 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
 
   private updateChart(progress: SolverProgress) {
     const value = this.progressType === 'sudoku' ?
-      progress.bestFitness :
-      -progress.bestFitness; // Convert negative fitness back to positive distance for TSP
+      progress.fitness :
+      -progress.fitness; // Convert negative fitness back to positive distance for TSP
 
     this.progressData.push({
       iteration: progress.iteration,
