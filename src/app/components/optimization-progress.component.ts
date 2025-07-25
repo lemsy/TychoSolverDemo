@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, OnInit, OnDestroy, ViewChild, signal } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, OnDestroy, OnChanges, ViewChild, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import * as d3 from 'd3';
@@ -140,10 +140,11 @@ export type ProgressType = 'sudoku' | 'tsp';
     }
   `]
 })
-export class OptimizationProgressComponent implements OnInit, OnDestroy {
+export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChanges {
     @ViewChild('progressChart', { static: true }) progressChartRef!: ElementRef;
     @Input() progressType: ProgressType = 'sudoku';
     @Input() initialValue?: number; // For TSP initial distance
+    @Input() isActive: boolean = false; // New input to control when this component should listen
 
     // State signals
     currentProgress = signal<SolverProgress | null>(null);
@@ -156,15 +157,24 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy {
     private progressChart: any;
     private subscriptions = new Subscription();
 
-    constructor(private solverService: SolverService) { }
-
-    ngOnInit() {
+    constructor(private solverService: SolverService) { } ngOnInit() {
         this.initializeChart();
         this.subscribeToProgress();
     }
 
     ngOnDestroy() {
         this.subscriptions.unsubscribe();
+    }
+
+    ngOnChanges() {
+        // Re-subscribe when isActive changes
+        if (this.isActive) {
+            this.subscribeToProgress();
+        } else {
+            // Unsubscribe when not active to prevent interference
+            this.subscriptions.unsubscribe();
+            this.subscriptions = new Subscription();
+        }
     }
 
     /**
@@ -187,16 +197,29 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy {
     }
 
     private subscribeToProgress() {
+        // Only subscribe if this component is active
+        if (!this.isActive) {
+            return;
+        }
+
+        // Clear any existing subscriptions first
+        this.subscriptions.unsubscribe();
+        this.subscriptions = new Subscription();
+
         // Subscribe to progress updates
         this.subscriptions.add(
             this.solverService.progress$.subscribe(progress => {
+                // Only process if this component is active
+                if (!this.isActive) {
+                    return;
+                }
+
                 if (progress) {
                     this.currentProgress.set(progress);
                     this.updateChart(progress);
                     this.calculateImprovement(progress);
                 } else {
                     // Only clear if this component was actually showing progress
-                    // This prevents clearing when switching between components
                     if (this.currentProgress() !== null) {
                         this.clearProgress();
                     }

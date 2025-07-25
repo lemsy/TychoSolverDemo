@@ -24,6 +24,7 @@ export class SudokuDemoComponent implements OnInit, OnDestroy {
   // State
   isRunning = signal(false);
   result = signal<SolverResult | null>(null);
+  isProgressActive = signal(false);
 
   // Data
   private subscriptions = new Subscription();
@@ -167,6 +168,9 @@ export class SudokuDemoComponent implements OnInit, OnDestroy {
     this.currentGrid = this.initialGrid.map(row => [...row]);
     this.initializeSudokuVisualization();
 
+    // Activate progress component
+    this.isProgressActive.set(true);
+
     this.solverService.solveSudoku(this.initialGrid, {
       populationSize: this.populationSize,
       maxIterations: this.maxIterations,
@@ -174,12 +178,14 @@ export class SudokuDemoComponent implements OnInit, OnDestroy {
     }).then(result => {
       this.result.set(result);
       this.progressComponent?.setResult(result);
+      this.isProgressActive.set(false); // Deactivate after completion
       // Update the visualization with the final solution
       if (result.solution) {
         this.updateSudokuVisualization(result.solution);
       }
     }).catch(error => {
       console.error('Solving failed:', error);
+      this.isProgressActive.set(false); // Deactivate on error
     });
   }
 
