@@ -9,7 +9,6 @@ import {
 export interface SolverProgress {
     iteration: number;
     fitness: number;
-    isComplete?: boolean;
 }
 
 export interface SolverResult {
@@ -143,8 +142,7 @@ export class SolverService {
             // Report initial progress
             this.progressSignal.set({
                 iteration: generation,
-                fitness: bestFitness,
-                isComplete: false
+                fitness: bestFitness
             });
 
             // Evolution loop
@@ -168,8 +166,7 @@ export class SolverService {
                 // Report progress after each generation
                 this.progressSignal.set({
                     iteration: generation + 1,
-                    fitness: bestFitness,
-                    isComplete: false
+                    fitness: bestFitness
                 });
 
                 // Check if solved
@@ -230,8 +227,7 @@ export class SolverService {
 
             this.progressSignal.set({
                 iteration: generation,
-                fitness: bestFitness,
-                isComplete: true
+                fitness: bestFitness
             });
 
             return solverResult;
@@ -325,8 +321,7 @@ export class SolverService {
             // Report initial progress
             this.progressSignal.set({
                 iteration: 0,
-                fitness: bestFitnessFound,
-                isComplete: false
+                fitness: bestFitnessFound
             });
 
             const result = await localSearch.search(
@@ -344,8 +339,7 @@ export class SolverService {
 
                         this.progressSignal.set({
                             iteration: iter,
-                            fitness: bestFitnessFound,
-                            isComplete: false
+                            fitness: bestFitnessFound
                         });
                     }
                 }
@@ -363,8 +357,7 @@ export class SolverService {
 
             this.progressSignal.set({
                 iteration: result.iterations,
-                fitness: Math.max(bestFitnessFound, result.fitness),
-                isComplete: true
+                fitness: Math.max(bestFitnessFound, result.fitness)
             });
 
             return solverResult;
@@ -509,8 +502,7 @@ export class SolverService {
                         iteration = iter;
                         this.progressSignal.set({
                             iteration,
-                            fitness: -fitness, // Convert back to positive distance
-                            isComplete: false
+                            fitness: -fitness // Convert back to positive distance
                         });
                     }
                 }
@@ -533,8 +525,7 @@ export class SolverService {
 
             this.progressSignal.set({
                 iteration: bestResult.iterations,
-                fitness: -bestResult.fitness,
-                isComplete: true
+                fitness: -bestResult.fitness
             });
 
             return solverResult;
@@ -578,8 +569,7 @@ export class SolverService {
                         iteration = iter;
                         this.progressSignal.set({
                             iteration,
-                            fitness: -fitness, // Convert back to positive distance
-                            isComplete: false
+                            fitness: -fitness // Convert back to positive distance
                         });
                     }
                 }
@@ -597,8 +587,7 @@ export class SolverService {
 
             this.progressSignal.set({
                 iteration: result.iterations,
-                fitness: -result.fitness,
-                isComplete: true
+                fitness: -result.fitness
             });
 
             return solverResult;
