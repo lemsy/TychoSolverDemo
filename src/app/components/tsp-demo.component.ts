@@ -151,7 +151,12 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   }
 
   startSolving() {
-    // Clear any previous progress
+    // Ensure progressType is set to 'tsp' before starting
+    if (this.progressComponent) {
+      this.progressComponent.progressType = 'tsp';
+    } else {
+      alert('Progress component is not initialized! The chart may not update correctly.');
+    }
     this.solverService.clearProgress('tsp');
     this.clearComponentState();
 

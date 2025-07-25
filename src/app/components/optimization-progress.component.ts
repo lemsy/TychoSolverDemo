@@ -178,7 +178,9 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
 
     // Effect to update chart when history changes
     effect(() => {
+      const type = this.progressTypeSignal();
       const progressHistory = this.progressHistoryFromService();
+      console.log('Chart update:', { type, progressHistory });
       this.renderChart(progressHistory);
     });
   }
