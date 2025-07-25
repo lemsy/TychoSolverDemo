@@ -180,7 +180,6 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
     effect(() => {
       const type = this.progressTypeSignal();
       const progressHistory = this.progressHistoryFromService();
-      console.log('Chart update:', { type, progressHistory });
       this.renderChart(progressHistory);
     });
   }
