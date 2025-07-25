@@ -1,29 +1,43 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { GeneticAlgorithm } from 'tycho-solver';
-import { LocalSearch } from 'tycho-solver';
-import type {
+
+// Import Tycho solver components
+import {
+    GeneticAlgorithm,
+    LocalSearch,
     FitnessFunction,
     EvolutionaryConfig,
-    ObjectiveFunction,
-    NeighborhoodFunction,
-    LocalSearchOptions,
-    LocalSearchResult
+    Individual,
+    GeneGenerator,
+    SelectionMethod,
+    CrossoverMethod,
+    MutationMethod
 } from 'tycho-solver';
-
-export interface SolverResult {
-    solution: any;
-    fitness: number;
-    iteration: number;
-    executionTime: number;
-}
 
 export interface SolverProgress {
     iteration: number;
     currentFitness: number;
     bestFitness: number;
-    solution: any;
+    improvement?: number;
+    isComplete?: boolean;
 }
+
+export interface SolverResult {
+    solution: any;
+    fitness: number;
+    iterations: number;
+    executionTime: number;
+}
+
+export interface City {
+    name: string;
+    x: number;
+    y: number;
+    lat?: number;
+    lon?: number;
+}
+
+export interface SudokuGrid extends Array<Array<number>> { }
 
 @Injectable({
     providedIn: 'root'
@@ -35,522 +49,646 @@ export class SolverService {
     private isRunningSubject = new BehaviorSubject<boolean>(false);
     public isRunning$ = this.isRunningSubject.asObservable();
 
+    // Sudoku constants
+    private readonly SUDOKU_SIZE = 9;
+    private readonly SUDOKU_SUBGRID = 3;
+
+    // Default Sudoku puzzle (0 = empty cell)
+    private readonly DEFAULT_SUDOKU: SudokuGrid = [
+        [5, 3, 0, 0, 7, 0, 0, 0, 0],
+        [6, 0, 0, 1, 9, 5, 0, 0, 0],
+        [0, 9, 8, 0, 0, 0, 0, 6, 0],
+        [8, 0, 0, 0, 6, 0, 0, 0, 3],
+        [4, 0, 0, 8, 0, 3, 0, 0, 1],
+        [7, 0, 0, 0, 2, 0, 0, 0, 6],
+        [0, 6, 0, 0, 0, 0, 2, 8, 0],
+        [0, 0, 0, 4, 1, 9, 0, 0, 5],
+        [0, 0, 0, 0, 8, 0, 0, 7, 9],
+    ];
+
+    // Spain cities data for TSP
+    private readonly SPAIN_CITIES_DATA = [
+        ["Madrid", 40.4168, -3.7038],
+        ["Barcelona", 41.3874, 2.1686],
+        ["Valencia", 39.4699, -0.3763],
+        ["Sevilla", 37.3886, -5.9823],
+        ["Zaragoza", 41.6488, -0.8891],
+        ["Málaga", 36.7213, -4.4214],
+        ["Murcia", 37.9847, -1.1285],
+        ["Bilbao", 43.2630, -2.9350],
+        ["Alicante", 38.3452, -0.4810],
+        ["Córdoba", 37.8882, -4.7794],
+        ["Valladolid", 41.6523, -4.7245],
+        ["Vigo", 42.2406, -8.7207],
+        ["Gijón", 43.5322, -5.6611],
+        ["A Coruña", 43.3623, -8.4115],
+        ["Vitoria-Gasteiz", 42.8467, -2.6727],
+        ["Granada", 37.1773, -3.5986],
+        ["Elche", 38.2699, -0.7126],
+        ["Oviedo", 43.3619, -5.8494],
+        ["Cartagena", 37.6257, -0.9966],
+        ["Jerez", 36.6850, -6.1261],
+        ["Pamplona", 42.8125, -1.6458],
+        ["Almería", 36.8340, -2.4637],
+        ["Santander", 43.4623, -3.8099],
+        ["Castellón", 39.9864, -0.0513],
+        ["Logroño", 42.4627, -2.4449],
+        ["Badajoz", 38.8794, -6.9707],
+        ["Salamanca", 40.9701, -5.6635],
+        ["Huelva", 37.2614, -6.9447],
+        ["Marbella", 36.5101, -4.8825],
+        ["Lleida", 41.6176, 0.6200],
+        ["Tarragona", 41.1189, 1.2445],
+        ["León", 42.5987, -5.5671],
+        ["Cádiz", 36.5271, -6.2886],
+        ["Jaén", 37.7796, -3.7849],
+        ["Ourense", 42.3367, -7.8641],
+        ["Santiago de Compostela", 42.8782, -8.5448],
+        ["Toledo", 39.8628, -4.0273],
+        ["Girona", 41.9794, 2.8214],
+        ["Cáceres", 39.4765, -6.3723],
+        ["Ciudad Real", 38.9861, -3.9272]
+    ];
+
     constructor() { }
 
-    updateProgress(progress: SolverProgress): void {
-        this.progressSubject.next(progress);
-    }
+    // SUDOKU METHODS
 
-    setRunning(running: boolean): void {
-        this.isRunningSubject.next(running);
-    }
-
-    // Sudoku-specific methods (using TychoSolver GeneticAlgorithm)
-    solveSudoku(
-        initialGrid: number[][],
+    /**
+     * Solves a Sudoku puzzle using Genetic Algorithm (alternative implementation)
+     */
+    async solveSudokuWithGA(
+        initialGrid?: SudokuGrid,
         options: {
             populationSize?: number;
             maxIterations?: number;
             mutationRate?: number;
+            crossoverRate?: number;
         } = {}
     ): Promise<SolverResult> {
-        return new Promise(async (resolve, reject) => {
-            try {
-                this.setRunning(true);
-                const startTime = Date.now();
+        const startTime = performance.now();
+        this.isRunningSubject.next(true);
 
-                // Initialize parameters
-                const {
-                    populationSize = 100,
-                    maxIterations = 100,
-                    mutationRate = 0.2
-                } = options;
+        const grid = initialGrid || this.copyGrid(this.DEFAULT_SUDOKU);
+        const {
+            populationSize = 50,
+            maxIterations = 100,
+            mutationRate = 0.1,
+            crossoverRate = 0.8
+        } = options;
 
-                // Get empty cells positions for constraint handling
-                const emptyCells: [number, number][] = [];
-                for (let row = 0; row < 9; row++) {
-                    for (let col = 0; col < 9; col++) {
-                        if (initialGrid[row][col] === 0) {
-                            emptyCells.push([row, col]);
-                        }
-                    }
-                }
-
-                // Helper to deep copy a grid
-                const copyGrid = (grid: number[][]): number[][] => {
-                    return grid.map(row => [...row]);
-                };
-
-                // Fitness function: count non-conflicting cells (from original demo)
-                const sudokuFitness: FitnessFunction<number[][]> = (individual: number[][]): number => {
-                    let score = 0;
-                    // Rows
-                    for (let i = 0; i < 9; i++) {
-                        const seen = new Set();
-                        for (let j = 0; j < 9; j++) seen.add(individual[i][j]);
-                        score += seen.size;
-                    }
-                    // Columns
-                    for (let j = 0; j < 9; j++) {
-                        const seen = new Set();
-                        for (let i = 0; i < 9; i++) seen.add(individual[i][j]);
-                        score += seen.size;
-                    }
-                    // Subgrids (3x3 boxes)
-                    for (let bi = 0; bi < 9; bi += 3) {
-                        for (let bj = 0; bj < 9; bj += 3) {
-                            const seen = new Set();
-                            for (let i = 0; i < 3; i++) {
-                                for (let j = 0; j < 3; j++) {
-                                    seen.add(individual[bi + i][bj + j]);
-                                }
-                            }
-                            score += seen.size;
-                        }
-                    }
-                    return score;
-                };
-
-                // Create initial population
-                const initialPopulation: number[][][] = [];
-                for (let i = 0; i < populationSize; i++) {
-                    const grid = copyGrid(initialGrid);
-                    emptyCells.forEach(([row, col]) => {
-                        grid[row][col] = Math.floor(Math.random() * 9) + 1;
-                    });
-                    initialPopulation.push(grid);
-                }
-
-                // Configure evolutionary algorithm
-                const config: EvolutionaryConfig = {
-                    populationSize: populationSize,
-                    maxGenerations: maxIterations,
-                    mutationRate: mutationRate,
-                    crossoverRate: 0.8,
-                    elitism: Math.floor(populationSize * 0.1)
-                };
-
-                // Create GeneticAlgorithm instance
-                const ga = new GeneticAlgorithm(initialPopulation, sudokuFitness, config);
-
-                // Monitor progress during evolution
-                let generation = 0;
-                const maxFitness = 243; // Perfect Sudoku score (9*9*3)
-
-                const evolveWithProgress = async () => {
-                    while (generation < maxIterations) {
-                        const currentBest = ga.getBestSolution();
-                        const currentFitness = ga.getBestFitness();
-
-                        // Update progress
-                        this.updateProgress({
-                            iteration: generation,
-                            currentFitness: currentFitness,
-                            bestFitness: currentFitness,
-                            solution: currentBest
-                        });
-
-                        // Check if solved
-                        if (currentFitness >= maxFitness) {
-                            this.setRunning(false);
-                            return {
-                                solution: currentBest,
-                                fitness: currentFitness,
-                                iteration: generation,
-                                executionTime: Date.now() - startTime
-                            };
-                        }
-
-                        // Evolve one generation
-                        await ga.evolve(1);
-                        generation++;
-
-                        // Small delay for visualization
-                        await new Promise(resolve => setTimeout(resolve, 10));
-                    }
-
-                    // Final solution
-                    const finalSolution = ga.getBestSolution();
-                    const finalFitness = ga.getBestFitness();
-                    this.setRunning(false);
-
-                    return {
-                        solution: finalSolution,
-                        fitness: finalFitness,
-                        iteration: generation,
-                        executionTime: Date.now() - startTime
-                    };
-                };
-
-                const result = await evolveWithProgress();
-                resolve(result);
-
-            } catch (error) {
-                this.setRunning(false);
-                reject(error);
-            }
-        });
-    }
-    const parent2 = this.tournamentSelection(population, 3);
-
-    // Crossover
-    const child = this.sudokuCrossover(parent1.genome, parent2.genome, initialGrid);
-
-    // Mutation
-    if(Math.random() < mutationRate) {
-    this.sudokuMutation(child, initialGrid);
-}
-
-newPopulation.push({
-    genome: child,
-    fitness: sudokuFitness(child)
-});
-          }
-
-// Replace population
-population.splice(0, population.length, ...newPopulation);
-population.sort((a, b) => b.fitness - a.fitness);
-
-// Update best solution
-if (population[0].fitness > bestSolution.fitness) {
-    bestSolution = population[0];
-}
-
-// Update progress
-this.updateProgress({
-    iteration: generation,
-    currentFitness: population[0].fitness,
-    bestFitness: bestSolution.fitness,
-    solution: bestSolution.genome
-});
-
-generation++;
-setTimeout(evolve, 10);
-        };
-
-evolve();
-        
-      } catch (error) {
-    this.setRunning(false);
-    reject(error);
-}
-    });
-  }
-
-// TSP-specific methods (following original demo patterns with simulated annealing)
-solveTSP(
-    cities: { name: string; x: number; y: number }[],
-    options: {
-        maxIterations?: number;
-        temperature?: number;
-    } = {}
-): Promise < SolverResult > {
-    return new Promise((resolve, reject) => {
         try {
-            this.setRunning(true);
-            const startTime = Date.now();
+            // Simple GA implementation for Sudoku
+            let population: SudokuGrid[] = [];
 
-            const {
-                maxIterations = 10000,
-                temperature = 100
-            } = options;
+            // Initialize population
+            for (let i = 0; i < populationSize; i++) {
+                population.push(this.createSudokuIndividual(grid));
+            }
 
-            // TSP objective function (from original demo pattern)
-            const tspObjective = (tour: number[]): number => {
-                let distance = 0;
-                for (let i = 0; i < tour.length; i++) {
-                    const current = cities[tour[i]];
-                    const next = cities[tour[(i + 1) % tour.length]];
-                    distance += Math.sqrt(
-                        Math.pow(current.x - next.x, 2) + Math.pow(current.y - next.y, 2)
-                    );
-                }
-                return distance;
-            };
+            let bestSolution = population[0];
+            let bestFitness = this.sudokuFitness(bestSolution);
+            let generation = 0;
 
-            // TSP neighborhood function (2-opt swap, from original demo pattern)
-            const tspNeighborhood = (tour: number[]): number[][] => {
-                const neighbors = [];
-                for (let i = 0; i < tour.length - 1; i++) {
-                    for (let j = i + 1; j < tour.length; j++) {
-                        const neighbor = [...tour];
-                        // Reverse the segment between i and j
-                        const segment = neighbor.slice(i, j + 1).reverse();
-                        neighbor.splice(i, j - i + 1, ...segment);
-                        neighbors.push(neighbor);
-                    }
-                }
-                return neighbors;
-            };
+            // Progress tracking
+            const progressInterval = setInterval(() => {
+                this.progressSubject.next({
+                    iteration: generation,
+                    currentFitness: bestFitness,
+                    bestFitness: bestFitness,
+                    isComplete: false
+                });
+            }, 100);
 
-            // Initialize with random tour
-            let currentTour = [...Array(cities.length).keys()];
-            this.shuffleArray(currentTour);
+            // Evolution loop
+            for (generation = 0; generation < maxIterations; generation++) {
+                // Evaluate population
+                const evaluated = population.map(individual => ({
+                    individual,
+                    fitness: this.sudokuFitness(individual)
+                }));
 
-            let bestTour = [...currentTour];
-            let currentDistance = tspObjective(currentTour);
-            let bestDistance = currentDistance;
+                // Update best
+                const currentBest = evaluated.reduce((prev, curr) =>
+                    curr.fitness > prev.fitness ? curr : prev
+                );
 
-            let iteration = 0;
-            let temp = temperature;
-            const coolingRate = 0.995; // From original demo
-
-            // Simulated Annealing search (following original demo pattern)
-            const search = () => {
-                if (iteration >= maxIterations) {
-                    this.setRunning(false);
-                    resolve({
-                        solution: bestTour,
-                        fitness: -bestDistance, // Negative because we want to minimize distance
-                        iteration,
-                        executionTime: Date.now() - startTime
-                    });
-                    return;
+                if (currentBest.fitness > bestFitness) {
+                    bestFitness = currentBest.fitness;
+                    bestSolution = this.copyGrid(currentBest.individual);
                 }
 
-                // Generate random neighbor using 2-opt
-                const newTour = this.twoOptSwap(currentTour);
-                const newDistance = tspObjective(newTour);
+                // Check if solved
+                if (bestFitness >= this.SUDOKU_SIZE * 3) break;
 
-                // Simulated annealing acceptance criteria
-                const delta = newDistance - currentDistance;
-                const acceptanceProbability = delta < 0 ? 1 : Math.exp(-delta / temp);
+                // Selection and reproduction
+                const newPopulation: SudokuGrid[] = [];
 
-                if (Math.random() < acceptanceProbability) {
-                    currentTour = newTour;
-                    currentDistance = newDistance;
+                // Elitism - keep best 10%
+                const eliteCount = Math.floor(populationSize * 0.1);
+                const elite = evaluated
+                    .sort((a, b) => b.fitness - a.fitness)
+                    .slice(0, eliteCount)
+                    .map(e => this.copyGrid(e.individual));
 
-                    // Update best solution if improved
-                    if (currentDistance < bestDistance) {
-                        bestTour = [...currentTour];
-                        bestDistance = currentDistance;
+                newPopulation.push(...elite);
+
+                // Generate rest of population
+                while (newPopulation.length < populationSize) {
+                    // Tournament selection
+                    const parent1 = this.tournamentSelection(evaluated, 3);
+                    const parent2 = this.tournamentSelection(evaluated, 3);
+
+                    // Crossover
+                    if (Math.random() < crossoverRate) {
+                        const [child1, child2] = this.sudokuCrossover(parent1.individual, parent2.individual, grid);
+                        newPopulation.push(child1);
+                        if (newPopulation.length < populationSize) {
+                            newPopulation.push(child2);
+                        }
+                    } else {
+                        newPopulation.push(this.copyGrid(parent1.individual));
+                        if (newPopulation.length < populationSize) {
+                            newPopulation.push(this.copyGrid(parent2.individual));
+                        }
                     }
                 }
 
-                // Cool down temperature
-                temp *= coolingRate;
-
-                // Update progress
-                this.updateProgress({
-                    iteration,
-                    currentFitness: -currentDistance,
-                    bestFitness: -bestDistance,
-                    solution: bestTour
+                // Mutation
+                newPopulation.forEach(individual => {
+                    if (Math.random() < mutationRate) {
+                        this.sudokuMutate(individual, grid);
+                    }
                 });
 
-                iteration++;
+                population = newPopulation;
+            }
 
-                // Continue search asynchronously (small delay for visualization)
-                setTimeout(search, 1);
+            clearInterval(progressInterval);
+
+            const endTime = performance.now();
+            const executionTime = endTime - startTime;
+
+            const solverResult: SolverResult = {
+                solution: bestSolution,
+                fitness: bestFitness,
+                iterations: generation,
+                executionTime
             };
 
-            search();
+            this.progressSubject.next({
+                iteration: generation,
+                currentFitness: bestFitness,
+                bestFitness: bestFitness,
+                isComplete: true
+            });
 
-        } catch (error) {
-            this.setRunning(false);
-            reject(error);
-        }
-    });
-}
-
-  // Helper methods for Sudoku (following original demo patterns)
-  private tournamentSelection(population: { genome: number[][], fitness: number }[], tournamentSize: number): { genome: number[][], fitness: number } {
-    let best = population[Math.floor(Math.random() * population.length)];
-
-    for (let i = 1; i < tournamentSize; i++) {
-        const candidate = population[Math.floor(Math.random() * population.length)];
-        if (candidate.fitness > best.fitness) {
-            best = candidate;
+            return solverResult;
+        } finally {
+            this.isRunningSubject.next(false);
         }
     }
 
-    return best;
-}
-
-  private sudokuCrossover(parent1: number[][], parent2: number[][], initialGrid: number[][]): number[][] {
-    const child = initialGrid.map(row => [...row]);
-
-    // For each cell that's not a clue, randomly choose from parent1 or parent2
-    for (let i = 0; i < 9; i++) {
-        for (let j = 0; j < 9; j++) {
-            if (child[i][j] === 0) {
-                child[i][j] = Math.random() < 0.5 ? parent1[i][j] : parent2[i][j];
+    /**
+     * Tournament selection for GA
+     */
+    private tournamentSelection(population: Array<{ individual: SudokuGrid, fitness: number }>, tournamentSize: number) {
+        let best = population[Math.floor(Math.random() * population.length)];
+        for (let i = 1; i < tournamentSize; i++) {
+            const candidate = population[Math.floor(Math.random() * population.length)];
+            if (candidate.fitness > best.fitness) {
+                best = candidate;
             }
         }
+        return best;
     }
 
-    return child;
-}
+    /**
+     * Crossover for Sudoku (row-based)
+     */
+    private sudokuCrossover(parent1: SudokuGrid, parent2: SudokuGrid, initialGrid: SudokuGrid): [SudokuGrid, SudokuGrid] {
+        const child1 = this.copyGrid(parent1);
+        const child2 = this.copyGrid(parent2);
 
-  private sudokuMutation(individual: number[][], initialGrid: number[][]): void {
-    // Find all empty cells in the original grid
-    const emptyCells: [number, number][] = [];
-    for(let i = 0; i < 9; i++) {
-    for (let j = 0; j < 9; j++) {
-        if (initialGrid[i][j] === 0) {
-            emptyCells.push([i, j]);
-        }
-    }
-}
+        // Single-point crossover at row level
+        const crossoverPoint = Math.floor(Math.random() * this.SUDOKU_SIZE);
 
-// Mutate 1-3 random empty cells
-const mutationCount = Math.floor(Math.random() * 3) + 1;
-for (let m = 0; m < mutationCount && emptyCells.length > 0; m++) {
-    const randomIndex = Math.floor(Math.random() * emptyCells.length);
-    const [i, j] = emptyCells[randomIndex];
-    individual[i][j] = Math.floor(Math.random() * 9) + 1;
-}
-  }
-
-  // Legacy helper methods (keeping for compatibility but not using the complex ones)
-  private initializeSudokuPopulation(initialGrid: number[][], size: number): number[][][] {
-    const population = [];
-    for (let i = 0; i < size; i++) {
-        const individual = this.createRandomSudoku(initialGrid);
-        population.push(individual);
-    }
-    return population;
-}
-
-  private createRandomSudoku(initialGrid: number[][]): number[][] {
-    const grid = initialGrid.map(row => [...row]);
-    for (let i = 0; i < 9; i++) {
-        for (let j = 0; j < 9; j++) {
-            if (grid[i][j] === 0) {
-                grid[i][j] = Math.floor(Math.random() * 9) + 1;
+        for (let i = crossoverPoint; i < this.SUDOKU_SIZE; i++) {
+            for (let j = 0; j < this.SUDOKU_SIZE; j++) {
+                if (initialGrid[i][j] === 0) { // Only change non-clue cells
+                    [child1[i][j], child2[i][j]] = [child2[i][j], child1[i][j]];
+                }
             }
         }
+
+        return [child1, child2];
     }
-    return grid;
-}
 
-  private calculateSudokuFitness(grid: number[][]): number {
-    let conflicts = 0;
+    /**
+     * Mutation for Sudoku
+     */
+    private sudokuMutate(individual: SudokuGrid, initialGrid: SudokuGrid): void {
+        const mutations = Math.floor(Math.random() * 3) + 1; // 1-3 mutations
 
-    // Check rows
-    for (let i = 0; i < 9; i++) {
-        const seen = new Set();
-        for (let j = 0; j < 9; j++) {
-            if (seen.has(grid[i][j])) conflicts++;
-            seen.add(grid[i][j]);
+        for (let m = 0; m < mutations; m++) {
+            let i, j;
+            do {
+                i = Math.floor(Math.random() * this.SUDOKU_SIZE);
+                j = Math.floor(Math.random() * this.SUDOKU_SIZE);
+            } while (initialGrid[i][j] !== 0); // Only mutate non-clue cells
+
+            individual[i][j] = Math.floor(Math.random() * this.SUDOKU_SIZE) + 1;
         }
     }
 
-    // Check columns
-    for (let j = 0; j < 9; j++) {
-        const seen = new Set();
-        for (let i = 0; i < 9; i++) {
-            if (seen.has(grid[i][j])) conflicts++;
-            seen.add(grid[i][j]);
+    /**
+     * Solves a Sudoku puzzle using Local Search (default method)
+     */
+    async solveSudoku(
+        initialGrid?: SudokuGrid,
+        options: {
+            populationSize?: number;
+            maxIterations?: number;
+            mutationRate?: number;
+            crossoverRate?: number;
+        } = {}
+    ): Promise<SolverResult> {
+        const startTime = performance.now();
+        this.isRunningSubject.next(true);
+
+        const grid = initialGrid || this.copyGrid(this.DEFAULT_SUDOKU);
+        const {
+            populationSize = 100,
+            maxIterations = 100,
+            mutationRate = 0.2,
+            crossoverRate = 0.7
+        } = options;
+
+        try {
+            // For this simple implementation, let's use a basic local search approach
+            const localSearch = new LocalSearch<SudokuGrid>();
+
+            const initialSolution = this.createSudokuIndividual(grid);
+
+            // Add progress tracking
+            let iteration = 0;
+            const progressInterval = setInterval(() => {
+                iteration++;
+                this.progressSubject.next({
+                    iteration,
+                    currentFitness: this.sudokuFitness(initialSolution),
+                    bestFitness: this.sudokuFitness(initialSolution),
+                    isComplete: false
+                });
+            }, 100);
+
+            const result = await localSearch.search(
+                initialSolution,
+                (solution: SudokuGrid) => this.sudokuFitness(solution),
+                (solution: SudokuGrid) => this.sudokuNeighborhood(solution, grid),
+                {
+                    maxIterations,
+                    maximize: true,
+                    onClimb: async (solution, fitness, iter) => {
+                        this.progressSubject.next({
+                            iteration: iter,
+                            currentFitness: fitness,
+                            bestFitness: fitness,
+                            isComplete: false
+                        });
+                    }
+                }
+            );
+
+            clearInterval(progressInterval);
+
+            const endTime = performance.now();
+            const executionTime = endTime - startTime;
+
+            const solverResult: SolverResult = {
+                solution: result.solution,
+                fitness: result.fitness,
+                iterations: result.iterations,
+                executionTime
+            };
+
+            this.progressSubject.next({
+                iteration: result.iterations,
+                currentFitness: result.fitness,
+                bestFitness: result.fitness,
+                isComplete: true
+            });
+
+            return solverResult;
+        } finally {
+            this.isRunningSubject.next(false);
         }
     }
 
-    // Check 3x3 boxes
-    for (let box = 0; box < 9; box++) {
-        const seen = new Set();
-        const startRow = Math.floor(box / 3) * 3;
-        const startCol = (box % 3) * 3;
-
-        for (let i = 0; i < 3; i++) {
-            for (let j = 0; j < 3; j++) {
-                const val = grid[startRow + i][startCol + j];
-                if (seen.has(val)) conflicts++;
-                seen.add(val);
+    /**
+     * Creates a valid Sudoku individual by filling empty cells randomly
+     */
+    private createSudokuIndividual(initialGrid: SudokuGrid): SudokuGrid {
+        const grid = this.copyGrid(initialGrid);
+        for (let i = 0; i < this.SUDOKU_SIZE; i++) {
+            for (let j = 0; j < this.SUDOKU_SIZE; j++) {
+                if (grid[i][j] === 0) {
+                    grid[i][j] = Math.floor(Math.random() * this.SUDOKU_SIZE) + 1;
+                }
             }
         }
+        return grid;
     }
 
-    return 243 - conflicts; // 243 is maximum possible (9*9*3)
-}
+    /**
+     * Calculates Sudoku fitness (higher is better)
+     */
+    private sudokuFitness(grid: SudokuGrid): number {
+        let score = 0;
 
-  private selectParent(population: number[][][]): number[][] {
-    // Tournament selection
-    const tournamentSize = 3;
-    let best = population[Math.floor(Math.random() * population.length)];
-    let bestFitness = this.calculateSudokuFitness(best);
-
-    for (let i = 1; i < tournamentSize; i++) {
-        const candidate = population[Math.floor(Math.random() * population.length)];
-        const fitness = this.calculateSudokuFitness(candidate);
-        if (fitness > bestFitness) {
-            best = candidate;
-            bestFitness = fitness;
+        // Check rows
+        for (let i = 0; i < this.SUDOKU_SIZE; i++) {
+            const seen = new Set();
+            for (let j = 0; j < this.SUDOKU_SIZE; j++) {
+                seen.add(grid[i][j]);
+            }
+            score += seen.size;
         }
-    }
 
-    return best;
-}
+        // Check columns
+        for (let j = 0; j < this.SUDOKU_SIZE; j++) {
+            const seen = new Set();
+            for (let i = 0; i < this.SUDOKU_SIZE; i++) {
+                seen.add(grid[i][j]);
+            }
+            score += seen.size;
+        }
 
-  private crossoverSudoku(parent1: number[][], parent2: number[][], initialGrid: number[][]): number[][] {
-    const child = initialGrid.map(row => [...row]);
-
-    for (let i = 0; i < 9; i++) {
-        for (let j = 0; j < 9; j++) {
-            if (child[i][j] === 0) {
-                child[i][j] = Math.random() < 0.5 ? parent1[i][j] : parent2[i][j];
+        // Check subgrids
+        for (let bi = 0; bi < this.SUDOKU_SIZE; bi += this.SUDOKU_SUBGRID) {
+            for (let bj = 0; bj < this.SUDOKU_SIZE; bj += this.SUDOKU_SUBGRID) {
+                const seen = new Set();
+                for (let i = 0; i < this.SUDOKU_SUBGRID; i++) {
+                    for (let j = 0; j < this.SUDOKU_SUBGRID; j++) {
+                        seen.add(grid[bi + i][bj + j]);
+                    }
+                }
+                score += seen.size;
             }
         }
+
+        return score;
     }
 
-    return child;
-}
+    /**
+     * Generates neighborhood solutions for local search
+     */
+    private sudokuNeighborhood(grid: SudokuGrid, initialGrid: SudokuGrid): SudokuGrid[] {
+        const neighbors: SudokuGrid[] = [];
 
-  private mutateSudoku(individual: number[][], initialGrid: number[][]): number[][] {
-    const mutated = individual.map(row => [...row]);
-
-    // Find empty cells in original
-    const emptyCells = [];
-    for (let i = 0; i < 9; i++) {
-        for (let j = 0; j < 9; j++) {
-            if (initialGrid[i][j] === 0) {
-                emptyCells.push([i, j]);
+        for (let i = 0; i < this.SUDOKU_SIZE; i++) {
+            for (let j = 0; j < this.SUDOKU_SIZE; j++) {
+                if (initialGrid[i][j] === 0) { // Only change non-clue cells
+                    for (let v = 1; v <= this.SUDOKU_SIZE; v++) {
+                        if (grid[i][j] !== v) {
+                            const neighbor = this.copyGrid(grid);
+                            neighbor[i][j] = v;
+                            neighbors.push(neighbor);
+                        }
+                    }
+                }
             }
+        }
+
+        return neighbors;
+    }
+
+    /**
+     * Gets the default Sudoku puzzle
+     */
+    getDefaultSudoku(): SudokuGrid {
+        return this.copyGrid(this.DEFAULT_SUDOKU);
+    }
+
+    /**
+     * Validates if a Sudoku grid is completely solved
+     */
+    isSudokuSolved(grid: SudokuGrid): boolean {
+        return this.sudokuFitness(grid) === this.SUDOKU_SIZE * 3;
+    }
+
+    // TSP METHODS
+
+    /**
+     * Solves TSP using Local Search
+     */
+    async solveTSP(
+        cities: City[],
+        options: {
+            maxIterations?: number;
+            initialTemperature?: number;
+        } = {}
+    ): Promise<SolverResult> {
+        const startTime = performance.now();
+        this.isRunningSubject.next(true);
+
+        const { maxIterations = 10000, initialTemperature = 100 } = options;
+
+        try {
+            // Create initial solution (random permutation)
+            const initialSolution = [...Array(cities.length).keys()].sort(() => Math.random() - 0.5);
+
+            // Setup Local Search
+            const localSearch = new LocalSearch<number[]>();
+
+            let iteration = 0;
+            let bestFitness = -this.calculateTourDistance(initialSolution, cities);
+            let currentFitness = bestFitness;
+
+            const result = await localSearch.search(
+                initialSolution,
+                (tour: number[]) => -this.calculateTourDistance(tour, cities), // Negative because we want to minimize distance
+                (tour: number[]) => this.tspNeighborhood(tour),
+                {
+                    maxIterations,
+                    maximize: true, // Maximize negative distance (minimize actual distance)
+                    onClimb: async (solution, fitness, iter) => {
+                        iteration = iter;
+                        this.progressSubject.next({
+                            iteration,
+                            currentFitness: -fitness, // Convert back to positive distance
+                            bestFitness: -fitness,
+                            isComplete: false
+                        });
+                    }
+                }
+            );
+
+            const endTime = performance.now();
+            const executionTime = endTime - startTime;
+
+            const solverResult: SolverResult = {
+                solution: result.solution,
+                fitness: -result.fitness, // Convert back to distance (positive)
+                iterations: result.iterations,
+                executionTime
+            };
+
+            this.progressSubject.next({
+                iteration: result.iterations,
+                currentFitness: -result.fitness,
+                bestFitness: -result.fitness,
+                isComplete: true
+            });
+
+            return solverResult;
+        } finally {
+            this.isRunningSubject.next(false);
         }
     }
 
-    // Mutate random empty cell
-    if (emptyCells.length > 0) {
-        const [i, j] = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-        mutated[i][j] = Math.floor(Math.random() * 9) + 1;
+    /**
+     * Creates a TSP instance from cities
+     */
+    private createTSPInstance(cities: City[]) {
+        return {
+            cities,
+            evaluate: (tour: number[]) => this.calculateTourDistance(tour, cities)
+        };
     }
 
-    return mutated;
-}
-
-  // Helper methods for TSP
-  private calculateTSPDistance(tour: number[], cities: { x: number; y: number }[]): number {
-    let distance = 0;
-    for (let i = 0; i < tour.length; i++) {
-        const current = cities[tour[i]];
-        const next = cities[tour[(i + 1) % tour.length]];
-        distance += Math.sqrt(
-            Math.pow(current.x - next.x, 2) + Math.pow(current.y - next.y, 2)
-        );
-    }
-    return distance;
-}
-
-  private twoOptSwap(tour: number[]): number[] {
-    const newTour = [...tour];
-    const i = Math.floor(Math.random() * tour.length);
-    const j = Math.floor(Math.random() * tour.length);
-
-    if (i !== j) {
-        const start = Math.min(i, j);
-        const end = Math.max(i, j);
-
-        // Reverse the segment between start and end
-        const segment = newTour.slice(start, end + 1).reverse();
-        newTour.splice(start, end - start + 1, ...segment);
+    /**
+     * Calculates total distance of a tour
+     */
+    private calculateTourDistance(tour: number[], cities: City[]): number {
+        let totalDistance = 0;
+        for (let i = 0; i < tour.length; i++) {
+            const from = cities[tour[i]];
+            const to = cities[tour[(i + 1) % tour.length]];
+            totalDistance += this.calculateDistance(from, to);
+        }
+        return totalDistance;
     }
 
-    return newTour;
-}
+    /**
+     * Calculates Euclidean distance between two cities
+     */
+    private calculateDistance(city1: City, city2: City): number {
+        const dx = city1.x - city2.x;
+        const dy = city1.y - city2.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
 
-  private shuffleArray(array: any[]): void {
-    for(let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-}
-  }
+    /**
+     * Generates neighborhood solutions using 2-opt
+     */
+    private tspNeighborhood(tour: number[]): number[][] {
+        const neighbors: number[][] = [];
+        const n = tour.length;
+
+        // Generate some 2-opt neighbors (limited for performance)
+        const maxNeighbors = Math.min(20, n * (n - 1) / 2);
+        const attempts = Math.min(100, maxNeighbors * 2);
+
+        for (let attempt = 0; attempt < attempts && neighbors.length < maxNeighbors; attempt++) {
+            const i = Math.floor(Math.random() * n);
+            const j = Math.floor(Math.random() * n);
+
+            if (i !== j) {
+                const neighbor = this.twoOptSwap(tour, Math.min(i, j), Math.max(i, j));
+                neighbors.push(neighbor);
+            }
+        }
+
+        return neighbors;
+    }
+
+    /**
+     * Performs 2-opt swap on a tour
+     */
+    private twoOptSwap(tour: number[], i: number, j: number): number[] {
+        const newTour = [...tour];
+        // Reverse the segment between i and j
+        while (i < j) {
+            [newTour[i], newTour[j]] = [newTour[j], newTour[i]];
+            i++;
+            j--;
+        }
+        return newTour;
+    }
+
+    /**
+     * Generates random cities
+     */
+    generateRandomCities(count: number, width: number = 800, height: number = 600): City[] {
+        const cities: City[] = [];
+        for (let i = 0; i < count; i++) {
+            cities.push({
+                name: `City ${i + 1}`,
+                x: Math.random() * width,
+                y: Math.random() * height
+            });
+        }
+        return cities;
+    }
+
+    /**
+     * Gets Spanish cities data
+     */
+    getSpainCities(count?: number): City[] {
+        const citiesToUse = count ? this.SPAIN_CITIES_DATA.slice(0, count) : this.SPAIN_CITIES_DATA;
+
+        return citiesToUse.map(([name, lat, lon]) => ({
+            name: name as string,
+            x: this.lonToX(lon as number),
+            y: this.latToY(lat as number),
+            lat: lat as number,
+            lon: lon as number
+        }));
+    }
+
+    /**
+     * Converts longitude to X coordinate (simple projection)
+     */
+    private lonToX(lon: number): number {
+        // Spain longitude range: approximately -9.3 to 4.3
+        const minLon = -9.3;
+        const maxLon = 4.3;
+        const width = 800;
+        return ((lon - minLon) / (maxLon - minLon)) * width;
+    }
+
+    /**
+     * Converts latitude to Y coordinate (simple projection)
+     */
+    private latToY(lat: number): number {
+        // Spain latitude range: approximately 35.2 to 43.8
+        const minLat = 35.2;
+        const maxLat = 43.8;
+        const height = 600;
+        return height - ((lat - minLat) / (maxLat - minLat)) * height; // Invert Y axis
+    }
+
+    // UTILITY METHODS
+
+    /**
+     * Deep copies a 2D grid
+     */
+    private copyGrid(grid: SudokuGrid): SudokuGrid {
+        return grid.map(row => [...row]);
+    }
+
+    /**
+     * Clears current progress
+     */
+    clearProgress(): void {
+        this.progressSubject.next(null);
+    }
+
+    /**
+     * Gets current running state
+     */
+    isRunning(): boolean {
+        return this.isRunningSubject.value;
+    }
 }
