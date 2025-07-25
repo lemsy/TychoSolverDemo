@@ -157,9 +157,15 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
     private progressChart: any;
     private subscriptions = new Subscription();
 
-    constructor(private solverService: SolverService) { } ngOnInit() {
+    constructor(private solverService: SolverService) { }
+
+    ngOnInit() {
+        console.log('OptimizationProgressComponent ngOnInit, isActive:', this.isActive);
         this.initializeChart();
-        this.subscribeToProgress();
+        // Don't subscribe immediately, wait for isActive to be true
+        if (this.isActive) {
+            this.subscribeToProgress();
+        }
     }
 
     ngOnDestroy() {
@@ -167,8 +173,12 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
     }
 
     ngOnChanges() {
+        console.log('OptimizationProgressComponent ngOnChanges, isActive:', this.isActive);
         // Re-subscribe when isActive changes
         if (this.isActive) {
+            // Clear any existing subscriptions first
+            this.subscriptions.unsubscribe();
+            this.subscriptions = new Subscription();
             this.subscribeToProgress();
         } else {
             // Unsubscribe when not active to prevent interference
@@ -197,8 +207,10 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
     }
 
     private subscribeToProgress() {
+        console.log('subscribeToProgress called, isActive:', this.isActive);
         // Only subscribe if this component is active
         if (!this.isActive) {
+            console.log('Component not active, skipping subscription');
             return;
         }
 
@@ -206,15 +218,19 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
         this.subscriptions.unsubscribe();
         this.subscriptions = new Subscription();
 
+        console.log('Setting up progress subscription');
         // Subscribe to progress updates
         this.subscriptions.add(
             this.solverService.progress$.subscribe(progress => {
+                console.log('Received progress update:', progress, 'isActive:', this.isActive);
                 // Only process if this component is active
                 if (!this.isActive) {
+                    console.log('Component not active, ignoring progress');
                     return;
                 }
 
                 if (progress) {
+                    console.log('Processing progress data');
                     this.currentProgress.set(progress);
                     this.updateChart(progress);
                     this.calculateImprovement(progress);

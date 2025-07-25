@@ -143,15 +143,13 @@ export class SolverService {
             let bestFitness = this.sudokuFitness(bestSolution);
             let generation = 0;
 
-            // Progress tracking
-            const progressInterval = setInterval(() => {
-                this.progressSubject.next({
-                    iteration: generation,
-                    currentFitness: bestFitness,
-                    bestFitness: bestFitness,
-                    isComplete: false
-                });
-            }, 100);
+            // Report initial progress
+            this.progressSubject.next({
+                iteration: generation,
+                currentFitness: bestFitness,
+                bestFitness: bestFitness,
+                isComplete: false
+            });
 
             // Evolution loop
             for (generation = 0; generation < maxIterations; generation++) {
@@ -170,6 +168,14 @@ export class SolverService {
                     bestFitness = currentBest.fitness;
                     bestSolution = this.copyGrid(currentBest.individual);
                 }
+
+                // Report progress after each generation
+                this.progressSubject.next({
+                    iteration: generation + 1,
+                    currentFitness: currentBest.fitness,
+                    bestFitness: bestFitness,
+                    isComplete: false
+                });
 
                 // Check if solved
                 if (bestFitness >= this.SUDOKU_SIZE * 3) break;
@@ -216,8 +222,6 @@ export class SolverService {
 
                 population = newPopulation;
             }
-
-            clearInterval(progressInterval);
 
             const endTime = performance.now();
             const executionTime = endTime - startTime;
@@ -322,18 +326,15 @@ export class SolverService {
             const localSearch = new LocalSearch<SudokuGrid>();
 
             const initialSolution = this.createSudokuIndividual(grid);
+            let bestFitnessFound = this.sudokuFitness(initialSolution);
 
-            // Add progress tracking
-            let iteration = 0;
-            const progressInterval = setInterval(() => {
-                iteration++;
-                this.progressSubject.next({
-                    iteration,
-                    currentFitness: this.sudokuFitness(initialSolution),
-                    bestFitness: this.sudokuFitness(initialSolution),
-                    isComplete: false
-                });
-            }, 100);
+            // Report initial progress
+            this.progressSubject.next({
+                iteration: 0,
+                currentFitness: bestFitnessFound,
+                bestFitness: bestFitnessFound,
+                isComplete: false
+            });
 
             const result = await localSearch.search(
                 initialSolution,
@@ -343,17 +344,20 @@ export class SolverService {
                     maxIterations,
                     maximize: true,
                     onClimb: async (solution, fitness, iter) => {
+                        // Update best fitness if we found a better one
+                        if (fitness > bestFitnessFound) {
+                            bestFitnessFound = fitness;
+                        }
+
                         this.progressSubject.next({
                             iteration: iter,
                             currentFitness: fitness,
-                            bestFitness: fitness,
+                            bestFitness: bestFitnessFound,
                             isComplete: false
                         });
                     }
                 }
             );
-
-            clearInterval(progressInterval);
 
             const endTime = performance.now();
             const executionTime = endTime - startTime;
@@ -368,7 +372,7 @@ export class SolverService {
             this.progressSubject.next({
                 iteration: result.iterations,
                 currentFitness: result.fitness,
-                bestFitness: result.fitness,
+                bestFitness: Math.max(bestFitnessFound, result.fitness),
                 isComplete: true
             });
 
