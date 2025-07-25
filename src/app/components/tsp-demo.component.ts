@@ -23,7 +23,6 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   // State
   isRunning = signal(false);
   result = signal<SolverResult | null>(null);
-  isProgressActive = signal(false); // New signal to control progress component
 
   // Data
   private cities: City[] = [];
@@ -52,7 +51,6 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
     this.currentTour = [];
     this.bestTour = [];
     this.initialDistance = 0;
-    this.isProgressActive.set(false);
     this.progressComponent?.clearProgress();
   } loadSpainCities() {
     this.cities = this.solverService.getSpainCities(this.numberOfCities);
@@ -163,8 +161,7 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
     this.initialDistance = this.calculateDistance(initialTour);
     this.updateTSPVisualization(initialTour);
 
-    // Activate progress component and set initial distance
-    this.isProgressActive.set(true);
+    // Set initial distance for improvement calculations
     this.progressComponent?.setInitialValue(this.initialDistance);
 
     this.solverService.solveTSP(this.cities, {
@@ -174,14 +171,12 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
       this.result.set(result);
       this.bestTour = result.solution;
       this.progressComponent?.setResult(result);
-      this.isProgressActive.set(false); // Deactivate after completion
       // Update the visualization with the final solution
       if (result.solution) {
         this.updateTSPVisualization(result.solution);
       }
     }).catch(error => {
       console.error('Solving failed:', error);
-      this.isProgressActive.set(false); // Deactivate on error
     });
   }
 

@@ -143,7 +143,7 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
   @ViewChild('progressChart', { static: true }) progressChartRef!: ElementRef;
   @Input() progressType: ProgressType = 'sudoku';
   @Input() initialValue?: number; // For TSP initial distance
-  @Input() isActive: boolean = false; // New input to control when this component should listen
+  @Input() isActive: boolean = false; // Kept for backward compatibility but not used
 
   // State signals
   currentProgress = signal<SolverProgress | null>(null);
@@ -151,28 +151,23 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
   improvement = signal<number>(0);
   finalImprovement = signal<number>(0);
 
-  // Internal data
-  private progressData: { iteration: number; value: number }[] = [];
+  // Internal data - now reactive to progress history
   private progressChart: any;
 
   constructor(private solverService: SolverService) {
-    // Use effect to automatically react to progress changes
+    // Use effect to automatically react to current progress changes
     effect(() => {
       const progress = this.solverService.progress();
-
-      // Only process if this component is active
-      if (!this.isActive) {
-        return;
-      }
-
       if (progress) {
         this.currentProgress.set(progress);
-        this.updateChart(progress);
         this.calculateImprovement(progress);
-      } else {
-        // Clear progress when null is received
-        this.clearProgress();
       }
+    });
+
+    // Use effect to automatically react to progress history changes and update chart
+    effect(() => {
+      const progressHistory = this.solverService.progressHistory();
+      this.renderChart(progressHistory);
     });
   }
 
@@ -185,10 +180,7 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
   }
 
   ngOnChanges() {
-    // When component becomes inactive, clear the progress
-    if (!this.isActive) {
-      this.clearProgress();
-    }
+    // This method is no longer needed since we're not using isActive
   }
 
   /**
@@ -199,7 +191,6 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
     this.result.set(null);
     this.improvement.set(0);
     this.finalImprovement.set(0);
-    this.progressData = [];
     this.initializeChart();
   }
 
@@ -216,24 +207,6 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
       const improvementPercent = ((this.initialValue - currentValue) / this.initialValue) * 100;
       this.improvement.set(Math.max(0, improvementPercent));
     }
-  }
-
-  private updateChart(progress: SolverProgress) {
-    const value = this.progressType === 'sudoku' ?
-      progress.fitness :
-      -progress.fitness; // Convert negative fitness back to positive distance for TSP
-
-    this.progressData.push({
-      iteration: progress.iteration,
-      value: value
-    });
-
-    // Keep only last 100 points for performance
-    if (this.progressData.length > 100) {
-      this.progressData = this.progressData.slice(-100);
-    }
-
-    this.renderChart();
   }
 
   private initializeChart() {
@@ -278,15 +251,29 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
       .text(this.progressType === 'sudoku' ? 'Fitness' : 'Distance');
   }
 
-  private renderChart() {
-    if (this.progressData.length === 0) return;
+  private renderChart(progressHistory: SolverProgress[]) {
+    if (progressHistory.length === 0) {
+      // Clear the chart if no data
+      if (this.progressChart) {
+        this.progressChart.selectAll('.progress-line').remove();
+      }
+      return;
+    }
+
+    // Convert progress history to chart data format
+    const progressData = progressHistory.map(progress => ({
+      iteration: progress.iteration,
+      value: this.progressType === 'sudoku' ?
+        progress.fitness :
+        progress.fitness // For TSP, fitness is already the positive distance
+    }));
 
     const margin = { top: 20, right: 30, bottom: 40, left: 60 };
     const width = 320 - margin.left - margin.right;
     const height = 200 - margin.top - margin.bottom;
 
-    const xExtent = d3.extent(this.progressData, d => d.iteration) as [number, number];
-    const yExtent = d3.extent(this.progressData, d => d.value) as [number, number];
+    const xExtent = d3.extent(progressData, d => d.iteration) as [number, number];
+    const yExtent = d3.extent(progressData, d => d.value) as [number, number];
 
     // For Sudoku, use fixed scale for better visualization
     const yDomain = this.progressType === 'sudoku' ?
@@ -294,7 +281,7 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
       yExtent;
 
     const xScale = d3.scaleLinear()
-      .domain(xExtent)
+      .domain(xExtent.length === 2 ? xExtent : [0, 1])
       .range([0, width]);
 
     const yScale = d3.scaleLinear()
@@ -315,7 +302,7 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
 
     // Update line
     const path = this.progressChart.selectAll('.progress-line')
-      .data([this.progressData]);
+      .data([progressData]);
 
     const color = this.progressType === 'sudoku' ? '#007acc' : '#28a745';
 
@@ -327,6 +314,9 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
       .attr('stroke-width', 2)
       .merge(path)
       .attr('d', line);
+
+    // Remove any excess paths
+    path.exit().remove();
   }
 
   getDisplayValue(fitness: number): string {

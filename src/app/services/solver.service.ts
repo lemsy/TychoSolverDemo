@@ -35,6 +35,9 @@ export class SolverService {
     private progressSignal = signal<SolverProgress | null>(null);
     public progress = this.progressSignal.asReadonly();
 
+    private progressHistorySignal = signal<SolverProgress[]>([]);
+    public progressHistory = this.progressHistorySignal.asReadonly();
+
     private isRunningSignal = signal<boolean>(false);
     public isRunning$ = this.isRunningSignal.asReadonly();
 
@@ -140,10 +143,12 @@ export class SolverService {
             let generation = 0;
 
             // Report initial progress
-            this.progressSignal.set({
+            const initialProgress = {
                 iteration: generation,
                 fitness: bestFitness
-            });
+            };
+            this.progressSignal.set(initialProgress);
+            this.progressHistorySignal.update(history => [...history, initialProgress]);
 
             // Evolution loop
             for (generation = 0; generation < maxIterations; generation++) {
@@ -164,10 +169,12 @@ export class SolverService {
                 }
 
                 // Report progress after each generation
-                this.progressSignal.set({
+                const progressUpdate = {
                     iteration: generation + 1,
                     fitness: bestFitness
-                });
+                };
+                this.progressSignal.set(progressUpdate);
+                this.progressHistorySignal.update(history => [...history, progressUpdate]);
 
                 // Check if solved
                 if (bestFitness >= this.SUDOKU_SIZE * 3) break;
@@ -225,9 +232,19 @@ export class SolverService {
                 executionTime
             };
 
-            this.progressSignal.set({
+            const finalProgress = {
                 iteration: generation,
                 fitness: bestFitness
+            };
+            this.progressSignal.set(finalProgress);
+            this.progressHistorySignal.update(history => {
+                // Update the last entry or add a new one if needed
+                const lastEntry = history[history.length - 1];
+                if (lastEntry && lastEntry.iteration === generation) {
+                    return [...history.slice(0, -1), finalProgress];
+                } else {
+                    return [...history, finalProgress];
+                }
             });
 
             return solverResult;
@@ -319,10 +336,12 @@ export class SolverService {
             let bestFitnessFound = this.sudokuFitness(initialSolution);
 
             // Report initial progress
-            this.progressSignal.set({
+            const initialProgress = {
                 iteration: 0,
                 fitness: bestFitnessFound
-            });
+            };
+            this.progressSignal.set(initialProgress);
+            this.progressHistorySignal.update(history => [...history, initialProgress]);
 
             const result = await localSearch.search(
                 initialSolution,
@@ -337,10 +356,12 @@ export class SolverService {
                             bestFitnessFound = fitness;
                         }
 
-                        this.progressSignal.set({
+                        const progressUpdate = {
                             iteration: iter,
                             fitness: bestFitnessFound
-                        });
+                        };
+                        this.progressSignal.set(progressUpdate);
+                        this.progressHistorySignal.update(history => [...history, progressUpdate]);
                     }
                 }
             );
@@ -355,9 +376,19 @@ export class SolverService {
                 executionTime
             };
 
-            this.progressSignal.set({
+            const finalProgress = {
                 iteration: result.iterations,
                 fitness: Math.max(bestFitnessFound, result.fitness)
+            };
+            this.progressSignal.set(finalProgress);
+            this.progressHistorySignal.update(history => {
+                // Update the last entry or add a new one if needed
+                const lastEntry = history[history.length - 1];
+                if (lastEntry && lastEntry.iteration === result.iterations) {
+                    return [...history.slice(0, -1), finalProgress];
+                } else {
+                    return [...history, finalProgress];
+                }
             });
 
             return solverResult;
@@ -491,6 +522,14 @@ export class SolverService {
             let iteration = 0;
             let bestFitness = -this.calculateTourDistance(initialSolutions[0], cities);
 
+            // Report initial progress
+            const initialProgress = {
+                iteration: 0,
+                fitness: -bestFitness // Convert back to positive distance
+            };
+            this.progressSignal.set(initialProgress);
+            this.progressHistorySignal.update(history => [...history, initialProgress]);
+
             const results = await parallelLocalSearch.search(
                 initialSolutions,
                 (tour: number[]) => -this.calculateTourDistance(tour, cities), // Negative because we want to minimize distance
@@ -500,10 +539,12 @@ export class SolverService {
                     maximize: true, // Maximize negative distance (minimize actual distance)
                     onClimb: async (solution, fitness, iter) => {
                         iteration = iter;
-                        this.progressSignal.set({
+                        const progressUpdate = {
                             iteration,
                             fitness: -fitness // Convert back to positive distance
-                        });
+                        };
+                        this.progressSignal.set(progressUpdate);
+                        this.progressHistorySignal.update(history => [...history, progressUpdate]);
                     }
                 }
             );
@@ -523,9 +564,19 @@ export class SolverService {
                 executionTime
             };
 
-            this.progressSignal.set({
+            const finalProgress = {
                 iteration: bestResult.iterations,
                 fitness: -bestResult.fitness
+            };
+            this.progressSignal.set(finalProgress);
+            this.progressHistorySignal.update(history => {
+                // Update the last entry or add a new one if needed
+                const lastEntry = history[history.length - 1];
+                if (lastEntry && lastEntry.iteration === bestResult.iterations) {
+                    return [...history.slice(0, -1), finalProgress];
+                } else {
+                    return [...history, finalProgress];
+                }
             });
 
             return solverResult;
@@ -558,6 +609,14 @@ export class SolverService {
             let iteration = 0;
             let bestFitness = -this.calculateTourDistance(initialSolution, cities);
 
+            // Report initial progress
+            const initialProgress = {
+                iteration: 0,
+                fitness: -bestFitness // Convert back to positive distance
+            };
+            this.progressSignal.set(initialProgress);
+            this.progressHistorySignal.update(history => [...history, initialProgress]);
+
             const result = await localSearch.search(
                 initialSolution,
                 (tour: number[]) => -this.calculateTourDistance(tour, cities), // Negative because we want to minimize distance
@@ -567,10 +626,12 @@ export class SolverService {
                     maximize: true, // Maximize negative distance (minimize actual distance)
                     onClimb: async (solution, fitness, iter) => {
                         iteration = iter;
-                        this.progressSignal.set({
+                        const progressUpdate = {
                             iteration,
                             fitness: -fitness // Convert back to positive distance
-                        });
+                        };
+                        this.progressSignal.set(progressUpdate);
+                        this.progressHistorySignal.update(history => [...history, progressUpdate]);
                     }
                 }
             );
@@ -585,9 +646,19 @@ export class SolverService {
                 executionTime
             };
 
-            this.progressSignal.set({
+            const finalProgress = {
                 iteration: result.iterations,
                 fitness: -result.fitness
+            };
+            this.progressSignal.set(finalProgress);
+            this.progressHistorySignal.update(history => {
+                // Update the last entry or add a new one if needed
+                const lastEntry = history[history.length - 1];
+                if (lastEntry && lastEntry.iteration === result.iterations) {
+                    return [...history.slice(0, -1), finalProgress];
+                } else {
+                    return [...history, finalProgress];
+                }
             });
 
             return solverResult;
@@ -733,6 +804,7 @@ export class SolverService {
      */
     clearProgress(): void {
         this.progressSignal.set(null);
+        this.progressHistorySignal.set([]);
         this.isRunningSignal.set(false);
     }
 
