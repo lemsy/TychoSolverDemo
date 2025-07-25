@@ -1,5 +1,4 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { Injectable, signal } from '@angular/core';
 
 // Import Tycho solver components
 import {
@@ -36,11 +35,11 @@ export interface SudokuGrid extends Array<Array<number>> { }
     providedIn: 'root'
 })
 export class SolverService {
-    private progressSubject = new BehaviorSubject<SolverProgress | null>(null);
-    public progress$ = this.progressSubject.asObservable();
+    private progressSignal = signal<SolverProgress | null>(null);
+    public progress = this.progressSignal.asReadonly();
 
-    private isRunningSubject = new BehaviorSubject<boolean>(false);
-    public isRunning$ = this.isRunningSubject.asObservable();
+    private isRunningSignal = signal<boolean>(false);
+    public isRunning$ = this.isRunningSignal.asReadonly();
 
     // Sudoku constants
     private readonly SUDOKU_SIZE = 9;
@@ -120,7 +119,7 @@ export class SolverService {
         } = {}
     ): Promise<SolverResult> {
         const startTime = performance.now();
-        this.isRunningSubject.next(true);
+        this.isRunningSignal.set(true);
 
         const grid = initialGrid || this.copyGrid(this.DEFAULT_SUDOKU);
         const {
@@ -144,7 +143,7 @@ export class SolverService {
             let generation = 0;
 
             // Report initial progress
-            this.progressSubject.next({
+            this.progressSignal.set({
                 iteration: generation,
                 currentFitness: bestFitness,
                 bestFitness: bestFitness,
@@ -170,7 +169,7 @@ export class SolverService {
                 }
 
                 // Report progress after each generation
-                this.progressSubject.next({
+                this.progressSignal.set({
                     iteration: generation + 1,
                     currentFitness: currentBest.fitness,
                     bestFitness: bestFitness,
@@ -233,7 +232,7 @@ export class SolverService {
                 executionTime
             };
 
-            this.progressSubject.next({
+            this.progressSignal.set({
                 iteration: generation,
                 currentFitness: bestFitness,
                 bestFitness: bestFitness,
@@ -242,7 +241,7 @@ export class SolverService {
 
             return solverResult;
         } finally {
-            this.isRunningSubject.next(false);
+            this.isRunningSignal.set(false);
         }
     }
 
@@ -311,7 +310,7 @@ export class SolverService {
         } = {}
     ): Promise<SolverResult> {
         const startTime = performance.now();
-        this.isRunningSubject.next(true);
+        this.isRunningSignal.set(true);
 
         const grid = initialGrid || this.copyGrid(this.DEFAULT_SUDOKU);
         const {
@@ -329,7 +328,7 @@ export class SolverService {
             let bestFitnessFound = this.sudokuFitness(initialSolution);
 
             // Report initial progress
-            this.progressSubject.next({
+            this.progressSignal.set({
                 iteration: 0,
                 currentFitness: bestFitnessFound,
                 bestFitness: bestFitnessFound,
@@ -349,7 +348,7 @@ export class SolverService {
                             bestFitnessFound = fitness;
                         }
 
-                        this.progressSubject.next({
+                        this.progressSignal.set({
                             iteration: iter,
                             currentFitness: fitness,
                             bestFitness: bestFitnessFound,
@@ -357,9 +356,7 @@ export class SolverService {
                         });
                     }
                 }
-            );
-
-            const endTime = performance.now();
+            ); const endTime = performance.now();
             const executionTime = endTime - startTime;
 
             const solverResult: SolverResult = {
@@ -369,7 +366,7 @@ export class SolverService {
                 executionTime
             };
 
-            this.progressSubject.next({
+            this.progressSignal.set({
                 iteration: result.iterations,
                 currentFitness: result.fitness,
                 bestFitness: Math.max(bestFitnessFound, result.fitness),
@@ -378,7 +375,7 @@ export class SolverService {
 
             return solverResult;
         } finally {
-            this.isRunningSubject.next(false);
+            this.isRunningSignal.set(false);
         }
     }
 
@@ -487,7 +484,7 @@ export class SolverService {
         } = {}
     ): Promise<SolverResult> {
         const startTime = performance.now();
-        this.isRunningSubject.next(true);
+        this.isRunningSignal.set(true);
 
         const {
             maxIterations = 10000,
@@ -516,7 +513,7 @@ export class SolverService {
                     maximize: true, // Maximize negative distance (minimize actual distance)
                     onClimb: async (solution, fitness, iter) => {
                         iteration = iter;
-                        this.progressSubject.next({
+                        this.progressSignal.set({
                             iteration,
                             currentFitness: -fitness, // Convert back to positive distance
                             bestFitness: -fitness,
@@ -541,7 +538,7 @@ export class SolverService {
                 executionTime
             };
 
-            this.progressSubject.next({
+            this.progressSignal.set({
                 iteration: bestResult.iterations,
                 currentFitness: -bestResult.fitness,
                 bestFitness: -bestResult.fitness,
@@ -550,7 +547,7 @@ export class SolverService {
 
             return solverResult;
         } finally {
-            this.isRunningSubject.next(false);
+            this.isRunningSignal.set(false);
         }
     }
 
@@ -564,7 +561,7 @@ export class SolverService {
         } = {}
     ): Promise<SolverResult> {
         const startTime = performance.now();
-        this.isRunningSubject.next(true);
+        this.isRunningSignal.set(true);
 
         const { maxIterations = 10000 } = options;
 
@@ -587,7 +584,7 @@ export class SolverService {
                     maximize: true, // Maximize negative distance (minimize actual distance)
                     onClimb: async (solution, fitness, iter) => {
                         iteration = iter;
-                        this.progressSubject.next({
+                        this.progressSignal.set({
                             iteration,
                             currentFitness: -fitness, // Convert back to positive distance
                             bestFitness: -fitness,
@@ -607,7 +604,7 @@ export class SolverService {
                 executionTime
             };
 
-            this.progressSubject.next({
+            this.progressSignal.set({
                 iteration: result.iterations,
                 currentFitness: -result.fitness,
                 bestFitness: -result.fitness,
@@ -616,7 +613,7 @@ export class SolverService {
 
             return solverResult;
         } finally {
-            this.isRunningSubject.next(false);
+            this.isRunningSignal.set(false);
         }
     }
 
@@ -756,14 +753,15 @@ export class SolverService {
      * Should be called when switching between different solver types
      */
     clearProgress(): void {
-        this.progressSubject.next(null);
-        this.isRunningSubject.next(false);
+        this.progressSignal.set(null);
+        this.isRunningSignal.set(false);
     }
 
     /**
      * Gets current running state
      */
     isRunning(): boolean {
-        return this.isRunningSubject.value;
+        return this.isRunningSignal();
     }
 }
+

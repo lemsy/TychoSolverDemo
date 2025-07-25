@@ -1,7 +1,6 @@
-import { Component, ElementRef, OnInit, OnDestroy, ViewChild, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, OnDestroy, ViewChild, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
 import * as d3 from 'd3';
 import { SolverService, SolverProgress, SolverResult, City } from '../services/solver.service';
 import { OptimizationProgressComponent } from './optimization-progress.component';
@@ -31,25 +30,21 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   private currentTour: number[] = [];
   private bestTour: number[] = [];
   private initialDistance = 0;
-  private subscriptions = new Subscription();
 
-  constructor(private solverService: SolverService) { }
+  constructor(private solverService: SolverService) {
+    // Use effect to automatically react to running state changes
+    effect(() => {
+      this.isRunning.set(this.solverService.isRunning$());
+    });
+  }
 
   ngOnInit() {
     this.loadSpainCities();
     this.initializeTSPVisualization();
-
-    // Subscribe to solver running state
-    this.subscriptions.add(
-      this.solverService.isRunning$.subscribe(running => {
-        this.isRunning.set(running);
-      })
-    );
   }
 
   ngOnDestroy() {
-    // Clean up subscriptions
-    this.subscriptions.unsubscribe();
+    // No longer needed since we're using effects instead of subscriptions
   }
 
   private clearComponentState() {

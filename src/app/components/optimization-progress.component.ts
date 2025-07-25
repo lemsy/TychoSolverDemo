@@ -1,16 +1,15 @@
-import { Component, ElementRef, Input, OnInit, OnDestroy, OnChanges, ViewChild, signal } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, OnDestroy, OnChanges, ViewChild, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Subscription } from 'rxjs';
 import * as d3 from 'd3';
 import { SolverService, SolverProgress, SolverResult } from '../services/solver.service';
 
 export type ProgressType = 'sudoku' | 'tsp';
 
 @Component({
-    selector: 'app-optimization-progress',
-    standalone: true,
-    imports: [CommonModule],
-    template: `
+  selector: 'app-optimization-progress',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
     <div class="progress-container">
       <div class="progress-info">
         <h3>Optimization Progress</h3>
@@ -64,7 +63,7 @@ export type ProgressType = 'sudoku' | 'tsp';
       </div>
     </div>
   `,
-    styles: [`
+  styles: [`
     .progress-container {
       background: white;
       border: 1px solid #ddd;
@@ -141,247 +140,214 @@ export type ProgressType = 'sudoku' | 'tsp';
   `]
 })
 export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChanges {
-    @ViewChild('progressChart', { static: true }) progressChartRef!: ElementRef;
-    @Input() progressType: ProgressType = 'sudoku';
-    @Input() initialValue?: number; // For TSP initial distance
-    @Input() isActive: boolean = false; // New input to control when this component should listen
+  @ViewChild('progressChart', { static: true }) progressChartRef!: ElementRef;
+  @Input() progressType: ProgressType = 'sudoku';
+  @Input() initialValue?: number; // For TSP initial distance
+  @Input() isActive: boolean = false; // New input to control when this component should listen
 
-    // State signals
-    currentProgress = signal<SolverProgress | null>(null);
-    result = signal<SolverResult | null>(null);
-    improvement = signal<number>(0);
-    finalImprovement = signal<number>(0);
+  // State signals
+  currentProgress = signal<SolverProgress | null>(null);
+  result = signal<SolverResult | null>(null);
+  improvement = signal<number>(0);
+  finalImprovement = signal<number>(0);
 
-    // Internal data
-    private progressData: { iteration: number; value: number }[] = [];
-    private progressChart: any;
-    private subscriptions = new Subscription();
+  // Internal data
+  private progressData: { iteration: number; value: number }[] = [];
+  private progressChart: any;
 
-    constructor(private solverService: SolverService) { }
+  constructor(private solverService: SolverService) {
+    // Use effect to automatically react to progress changes
+    effect(() => {
+      const progress = this.solverService.progress();
 
-    ngOnInit() {
-        console.log('OptimizationProgressComponent ngOnInit, isActive:', this.isActive);
-        this.initializeChart();
-        // Don't subscribe immediately, wait for isActive to be true
-        if (this.isActive) {
-            this.subscribeToProgress();
-        }
+      // Only process if this component is active
+      if (!this.isActive) {
+        return;
+      }
+
+      if (progress) {
+        this.currentProgress.set(progress);
+        this.updateChart(progress);
+        this.calculateImprovement(progress);
+      } else {
+        // Clear progress when null is received
+        this.clearProgress();
+      }
+    });
+  }
+
+  ngOnInit() {
+    this.initializeChart();
+  }
+
+  ngOnDestroy() {
+    // No longer needed since we're using effects instead of subscriptions
+  }
+
+  ngOnChanges() {
+    // When component becomes inactive, clear the progress
+    if (!this.isActive) {
+      this.clearProgress();
+    }
+  }
+
+  /**
+   * Clears all progress data and resets the chart
+   */
+  clearProgress() {
+    this.currentProgress.set(null);
+    this.result.set(null);
+    this.improvement.set(0);
+    this.finalImprovement.set(0);
+    this.progressData = [];
+    this.initializeChart();
+  }
+
+  /**
+   * Sets the initial value for improvement calculations (TSP only)
+   */
+  setInitialValue(value: number) {
+    this.initialValue = value;
+  }
+
+  private calculateImprovement(progress: SolverProgress) {
+    if (this.progressType === 'tsp' && this.initialValue) {
+      const currentValue = -progress.bestFitness; // TSP fitness is negative distance
+      const improvementPercent = ((this.initialValue - currentValue) / this.initialValue) * 100;
+      this.improvement.set(Math.max(0, improvementPercent));
+    }
+  }
+
+  private updateChart(progress: SolverProgress) {
+    const value = this.progressType === 'sudoku' ?
+      progress.bestFitness :
+      -progress.bestFitness; // Convert negative fitness back to positive distance for TSP
+
+    this.progressData.push({
+      iteration: progress.iteration,
+      value: value
+    });
+
+    // Keep only last 100 points for performance
+    if (this.progressData.length > 100) {
+      this.progressData = this.progressData.slice(-100);
     }
 
-    ngOnDestroy() {
-        this.subscriptions.unsubscribe();
+    this.renderChart();
+  }
+
+  private initializeChart() {
+    const container = d3.select(this.progressChartRef.nativeElement);
+    container.selectAll('*').remove();
+
+    const margin = { top: 20, right: 30, bottom: 40, left: 60 };
+    const width = 320 - margin.left - margin.right;
+    const height = 200 - margin.top - margin.bottom;
+
+    const svg = container
+      .append('svg')
+      .attr('width', width + margin.left + margin.right)
+      .attr('height', height + margin.top + margin.bottom);
+
+    this.progressChart = svg
+      .append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    // Add axes
+    this.progressChart.append('g')
+      .attr('class', 'x-axis')
+      .attr('transform', `translate(0,${height})`);
+
+    this.progressChart.append('g')
+      .attr('class', 'y-axis');
+
+    // Add labels
+    svg.append('text')
+      .attr('x', width / 2 + margin.left)
+      .attr('y', height + margin.top + margin.bottom - 5)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '12px')
+      .text('Iteration');
+
+    svg.append('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('x', -(height / 2 + margin.top))
+      .attr('y', 15)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '12px')
+      .text(this.progressType === 'sudoku' ? 'Fitness' : 'Distance');
+  }
+
+  private renderChart() {
+    if (this.progressData.length === 0) return;
+
+    const margin = { top: 20, right: 30, bottom: 40, left: 60 };
+    const width = 320 - margin.left - margin.right;
+    const height = 200 - margin.top - margin.bottom;
+
+    const xExtent = d3.extent(this.progressData, d => d.iteration) as [number, number];
+    const yExtent = d3.extent(this.progressData, d => d.value) as [number, number];
+
+    // For Sudoku, use fixed scale for better visualization
+    const yDomain = this.progressType === 'sudoku' ?
+      [0, 243] : // Sudoku max fitness is around 243
+      yExtent;
+
+    const xScale = d3.scaleLinear()
+      .domain(xExtent)
+      .range([0, width]);
+
+    const yScale = d3.scaleLinear()
+      .domain(yDomain)
+      .range([height, 0]);
+
+    const line = d3.line<{ iteration: number; value: number }>()
+      .x(d => xScale(d.iteration))
+      .y(d => yScale(d.value))
+      .curve(d3.curveMonotoneX);
+
+    // Update axes
+    this.progressChart.select('.x-axis')
+      .call(d3.axisBottom(xScale).tickFormat(d3.format('d')));
+
+    this.progressChart.select('.y-axis')
+      .call(d3.axisLeft(yScale).tickFormat(d3.format(this.progressType === 'tsp' ? '.1f' : 'd')));
+
+    // Update line
+    const path = this.progressChart.selectAll('.progress-line')
+      .data([this.progressData]);
+
+    const color = this.progressType === 'sudoku' ? '#007acc' : '#28a745';
+
+    path.enter()
+      .append('path')
+      .attr('class', 'progress-line')
+      .attr('fill', 'none')
+      .attr('stroke', color)
+      .attr('stroke-width', 2)
+      .merge(path)
+      .attr('d', line);
+  }
+
+  getDisplayValue(fitness: number): string {
+    if (this.progressType === 'sudoku') {
+      return fitness.toString();
+    } else {
+      // For TSP, convert negative fitness back to positive distance
+      return (-fitness).toFixed(1);
     }
+  }
 
-    ngOnChanges() {
-        console.log('OptimizationProgressComponent ngOnChanges, isActive:', this.isActive);
-        // Re-subscribe when isActive changes
-        if (this.isActive) {
-            // Clear any existing subscriptions first
-            this.subscriptions.unsubscribe();
-            this.subscriptions = new Subscription();
-            this.subscribeToProgress();
-        } else {
-            // Unsubscribe when not active to prevent interference
-            this.subscriptions.unsubscribe();
-            this.subscriptions = new Subscription();
-        }
+  /**
+   * Sets the final result and calculates final improvement
+   */
+  setResult(result: SolverResult) {
+    this.result.set(result);
+
+    if (this.progressType === 'tsp' && this.initialValue) {
+      const finalValue = -result.fitness;
+      const improvementPercent = ((this.initialValue - finalValue) / this.initialValue) * 100;
+      this.finalImprovement.set(Math.max(0, improvementPercent));
     }
-
-    /**
-     * Clears all progress data and resets the chart
-     */
-    clearProgress() {
-        this.currentProgress.set(null);
-        this.result.set(null);
-        this.improvement.set(0);
-        this.finalImprovement.set(0);
-        this.progressData = [];
-        this.initializeChart();
-    }
-
-    /**
-     * Sets the initial value for improvement calculations (TSP only)
-     */
-    setInitialValue(value: number) {
-        this.initialValue = value;
-    }
-
-    private subscribeToProgress() {
-        console.log('subscribeToProgress called, isActive:', this.isActive);
-        // Only subscribe if this component is active
-        if (!this.isActive) {
-            console.log('Component not active, skipping subscription');
-            return;
-        }
-
-        // Clear any existing subscriptions first
-        this.subscriptions.unsubscribe();
-        this.subscriptions = new Subscription();
-
-        console.log('Setting up progress subscription');
-        // Subscribe to progress updates
-        this.subscriptions.add(
-            this.solverService.progress$.subscribe(progress => {
-                console.log('Received progress update:', progress, 'isActive:', this.isActive);
-                // Only process if this component is active
-                if (!this.isActive) {
-                    console.log('Component not active, ignoring progress');
-                    return;
-                }
-
-                if (progress) {
-                    console.log('Processing progress data');
-                    this.currentProgress.set(progress);
-                    this.updateChart(progress);
-                    this.calculateImprovement(progress);
-                } else {
-                    // Only clear if this component was actually showing progress
-                    if (this.currentProgress() !== null) {
-                        this.clearProgress();
-                    }
-                }
-            })
-        );
-    }
-
-    private calculateImprovement(progress: SolverProgress) {
-        if (this.progressType === 'tsp' && this.initialValue) {
-            const currentValue = -progress.bestFitness; // TSP fitness is negative distance
-            const improvementPercent = ((this.initialValue - currentValue) / this.initialValue) * 100;
-            this.improvement.set(Math.max(0, improvementPercent));
-        }
-    }
-
-    private updateChart(progress: SolverProgress) {
-        const value = this.progressType === 'sudoku' ?
-            progress.bestFitness :
-            -progress.bestFitness; // Convert negative fitness back to positive distance for TSP
-
-        this.progressData.push({
-            iteration: progress.iteration,
-            value: value
-        });
-
-        // Keep only last 100 points for performance
-        if (this.progressData.length > 100) {
-            this.progressData = this.progressData.slice(-100);
-        }
-
-        this.renderChart();
-    }
-
-    private initializeChart() {
-        const container = d3.select(this.progressChartRef.nativeElement);
-        container.selectAll('*').remove();
-
-        const margin = { top: 20, right: 30, bottom: 40, left: 60 };
-        const width = 320 - margin.left - margin.right;
-        const height = 200 - margin.top - margin.bottom;
-
-        const svg = container
-            .append('svg')
-            .attr('width', width + margin.left + margin.right)
-            .attr('height', height + margin.top + margin.bottom);
-
-        this.progressChart = svg
-            .append('g')
-            .attr('transform', `translate(${margin.left},${margin.top})`);
-
-        // Add axes
-        this.progressChart.append('g')
-            .attr('class', 'x-axis')
-            .attr('transform', `translate(0,${height})`);
-
-        this.progressChart.append('g')
-            .attr('class', 'y-axis');
-
-        // Add labels
-        svg.append('text')
-            .attr('x', width / 2 + margin.left)
-            .attr('y', height + margin.top + margin.bottom - 5)
-            .attr('text-anchor', 'middle')
-            .style('font-size', '12px')
-            .text('Iteration');
-
-        svg.append('text')
-            .attr('transform', 'rotate(-90)')
-            .attr('x', -(height / 2 + margin.top))
-            .attr('y', 15)
-            .attr('text-anchor', 'middle')
-            .style('font-size', '12px')
-            .text(this.progressType === 'sudoku' ? 'Fitness' : 'Distance');
-    }
-
-    private renderChart() {
-        if (this.progressData.length === 0) return;
-
-        const margin = { top: 20, right: 30, bottom: 40, left: 60 };
-        const width = 320 - margin.left - margin.right;
-        const height = 200 - margin.top - margin.bottom;
-
-        const xExtent = d3.extent(this.progressData, d => d.iteration) as [number, number];
-        const yExtent = d3.extent(this.progressData, d => d.value) as [number, number];
-
-        // For Sudoku, use fixed scale for better visualization
-        const yDomain = this.progressType === 'sudoku' ?
-            [0, 243] : // Sudoku max fitness is around 243
-            yExtent;
-
-        const xScale = d3.scaleLinear()
-            .domain(xExtent)
-            .range([0, width]);
-
-        const yScale = d3.scaleLinear()
-            .domain(yDomain)
-            .range([height, 0]);
-
-        const line = d3.line<{ iteration: number; value: number }>()
-            .x(d => xScale(d.iteration))
-            .y(d => yScale(d.value))
-            .curve(d3.curveMonotoneX);
-
-        // Update axes
-        this.progressChart.select('.x-axis')
-            .call(d3.axisBottom(xScale).tickFormat(d3.format('d')));
-
-        this.progressChart.select('.y-axis')
-            .call(d3.axisLeft(yScale).tickFormat(d3.format(this.progressType === 'tsp' ? '.1f' : 'd')));
-
-        // Update line
-        const path = this.progressChart.selectAll('.progress-line')
-            .data([this.progressData]);
-
-        const color = this.progressType === 'sudoku' ? '#007acc' : '#28a745';
-
-        path.enter()
-            .append('path')
-            .attr('class', 'progress-line')
-            .attr('fill', 'none')
-            .attr('stroke', color)
-            .attr('stroke-width', 2)
-            .merge(path)
-            .attr('d', line);
-    }
-
-    getDisplayValue(fitness: number): string {
-        if (this.progressType === 'sudoku') {
-            return fitness.toString();
-        } else {
-            // For TSP, convert negative fitness back to positive distance
-            return (-fitness).toFixed(1);
-        }
-    }
-
-    /**
-     * Sets the final result and calculates final improvement
-     */
-    setResult(result: SolverResult) {
-        this.result.set(result);
-
-        if (this.progressType === 'tsp' && this.initialValue) {
-            const finalValue = -result.fitness;
-            const improvementPercent = ((this.initialValue - finalValue) / this.initialValue) * 100;
-            this.finalImprovement.set(Math.max(0, improvementPercent));
-        }
-    }
+  }
 }
