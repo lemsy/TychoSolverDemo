@@ -21,8 +21,14 @@ import { SolverService, SolverProgress, SolverResult, City } from '../services/s
           </div>
           
           <div class="parameter-group">
-            <label>Initial Temperature:</label>
-            <input type="number" [(ngModel)]="initialTemperature" [disabled]="isRunning()" min="10" max="1000" step="10">
+            <label>Parallel Workers:</label>
+            <select [(ngModel)]="numWorkers" [disabled]="isRunning()">
+              <option value="1">1 Worker</option>
+              <option value="2">2 Workers</option>
+              <option value="4">4 Workers</option>
+              <option value="6">6 Workers</option>
+              <option value="8">8 Workers</option>
+            </select>
           </div>
           
           <div class="parameter-group">
@@ -278,7 +284,7 @@ export class TSPDemoComponent implements OnInit {
 
   // Parameters
   maxIterations = 10000;
-  initialTemperature = 100;
+  numWorkers = 4;
   numberOfCities = 20;
 
   // State
@@ -521,7 +527,7 @@ export class TSPDemoComponent implements OnInit {
 
     this.solverService.solveTSP(this.cities, {
       maxIterations: this.maxIterations,
-      initialTemperature: this.initialTemperature
+      numWorkers: this.numWorkers
     }).then(result => {
       this.result.set(result);
       this.bestTour = result.solution;

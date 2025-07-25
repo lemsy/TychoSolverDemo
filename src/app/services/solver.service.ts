@@ -479,7 +479,6 @@ export class SolverService {
         cities: City[],
         options: {
             maxIterations?: number;
-            initialTemperature?: number;
             numWorkers?: number;
         } = {}
     ): Promise<SolverResult> {
@@ -488,7 +487,6 @@ export class SolverService {
 
         const {
             maxIterations = 10000,
-            initialTemperature = 100,
             numWorkers = 4
         } = options;
 
@@ -559,13 +557,12 @@ export class SolverService {
         cities: City[],
         options: {
             maxIterations?: number;
-            initialTemperature?: number;
         } = {}
     ): Promise<SolverResult> {
         const startTime = performance.now();
         this.isRunningSubject.next(true);
 
-        const { maxIterations = 10000, initialTemperature = 100 } = options;
+        const { maxIterations = 10000 } = options;
 
         try {
             // Create initial solution (random permutation)
