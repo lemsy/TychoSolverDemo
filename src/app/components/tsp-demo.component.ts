@@ -1,6 +1,7 @@
-import { Component, ElementRef, OnInit, ViewChild, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, OnDestroy, ViewChild, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import * as d3 from 'd3';
 import { SolverService, SolverProgress, SolverResult, City } from '../services/solver.service';
 
@@ -10,7 +11,7 @@ import { SolverService, SolverProgress, SolverResult, City } from '../services/s
   templateUrl: './tsp-demo.component.html',
   styleUrl: './tsp-demo.component.css'
 })
-export class TSPDemoComponent implements OnInit {
+export class TSPDemoComponent implements OnInit, OnDestroy {
   @ViewChild('tspMap', { static: true }) tspMapRef!: ElementRef;
   @ViewChild('progressChart', { static: true }) progressChartRef!: ElementRef;
 
@@ -31,28 +32,53 @@ export class TSPDemoComponent implements OnInit {
   private initialDistance = 0;
   private progressData: { iteration: number; distance: number }[] = [];
   private progressChart: any;
+  private subscriptions = new Subscription();
 
   constructor(private solverService: SolverService) { }
 
   ngOnInit() {
+    // Clear any previous progress from other components
+    this.solverService.clearProgress();
+    this.clearComponentState();
+
     this.loadSpainCities();
     this.initializeTSPVisualization();
     this.initializeProgressChart();
 
     // Subscribe to solver progress
-    this.solverService.progress$.subscribe(progress => {
-      if (progress) {
-        this.currentProgress.set(progress);
-        this.updateProgressChart(progress);
-        // Note: We don't update visualization from progress as it doesn't contain the solution
-        // The solution will be updated when the solving is complete
-      }
-    });
+    this.subscriptions.add(
+      this.solverService.progress$.subscribe(progress => {
+        if (progress) {
+          this.currentProgress.set(progress);
+          this.updateProgressChart(progress);
+          // Note: We don't update visualization from progress as it doesn't contain the solution
+          // The solution will be updated when the solving is complete
+        }
+      })
+    );
 
     // Subscribe to solver running state
-    this.solverService.isRunning$.subscribe(running => {
-      this.isRunning.set(running);
-    });
+    this.subscriptions.add(
+      this.solverService.isRunning$.subscribe(running => {
+        this.isRunning.set(running);
+      })
+    );
+  }
+
+  ngOnDestroy() {
+    // Clean up subscriptions
+    this.subscriptions.unsubscribe();
+    // Clear progress when leaving this component
+    this.solverService.clearProgress();
+  }
+
+  private clearComponentState() {
+    this.currentProgress.set(null);
+    this.result.set(null);
+    this.progressData = [];
+    this.currentTour = [];
+    this.bestTour = [];
+    this.initialDistance = 0;
   }
 
   loadSpainCities() {
@@ -248,14 +274,14 @@ export class TSPDemoComponent implements OnInit {
   }
 
   startSolving() {
-    this.result.set(null);
-    this.progressData = [];
+    this.clearComponentState();
 
     // Calculate initial distance with random tour
     const initialTour = [...Array(this.cities.length).keys()];
     this.shuffleArray(initialTour);
     this.initialDistance = this.calculateDistance(initialTour);
     this.updateTSPVisualization(initialTour);
+    this.initializeProgressChart();
 
     this.solverService.solveTSP(this.cities, {
       maxIterations: this.maxIterations,

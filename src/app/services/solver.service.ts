@@ -748,10 +748,12 @@ export class SolverService {
     }
 
     /**
-     * Clears current progress
+     * Clears current progress and resets running state
+     * Should be called when switching between different solver types
      */
     clearProgress(): void {
         this.progressSubject.next(null);
+        this.isRunningSubject.next(false);
     }
 
     /**

@@ -1,6 +1,7 @@
-import { Component, ElementRef, OnInit, ViewChild, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, OnDestroy, ViewChild, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import * as d3 from 'd3';
 import { SolverService, SolverProgress, SolverResult } from '../services/solver.service';
 
@@ -10,7 +11,7 @@ import { SolverService, SolverProgress, SolverResult } from '../services/solver.
   templateUrl: './sudoku-demo.component.html',
   styleUrl: './sudoku-demo.component.css'
 })
-export class SudokuDemoComponent implements OnInit {
+export class SudokuDemoComponent implements OnInit, OnDestroy {
   @ViewChild('sudokuGrid', { static: true }) sudokuGridRef!: ElementRef;
   @ViewChild('progressChart', { static: true }) progressChartRef!: ElementRef;
 
@@ -27,6 +28,7 @@ export class SudokuDemoComponent implements OnInit {
   // Data
   private progressData: { iteration: number; fitness: number }[] = [];
   private progressChart: any;
+  private subscriptions = new Subscription();
 
   // Initial Sudoku puzzle
   private initialGrid = [
@@ -46,23 +48,44 @@ export class SudokuDemoComponent implements OnInit {
   constructor(private solverService: SolverService) { }
 
   ngOnInit() {
+    // Clear any previous progress from other components
+    this.solverService.clearProgress();
+    this.clearComponentState();
+
     this.initializeSudokuVisualization();
     this.initializeProgressChart();
 
     // Subscribe to solver progress
-    this.solverService.progress$.subscribe(progress => {
-      if (progress) {
-        this.currentProgress.set(progress);
-        this.updateProgressChart(progress);
-        // Note: We don't update visualization from progress as it doesn't contain the solution
-        // The solution will be updated when the solving is complete
-      }
-    });
+    this.subscriptions.add(
+      this.solverService.progress$.subscribe(progress => {
+        if (progress) {
+          this.currentProgress.set(progress);
+          this.updateProgressChart(progress);
+          // Note: We don't update visualization from progress as it doesn't contain the solution
+          // The solution will be updated when the solving is complete
+        }
+      })
+    );
 
     // Subscribe to solver running state
-    this.solverService.isRunning$.subscribe(running => {
-      this.isRunning.set(running);
-    });
+    this.subscriptions.add(
+      this.solverService.isRunning$.subscribe(running => {
+        this.isRunning.set(running);
+      })
+    );
+  }
+
+  ngOnDestroy() {
+    // Clean up subscriptions
+    this.subscriptions.unsubscribe();
+    // Clear progress when leaving this component
+    this.solverService.clearProgress();
+  }
+
+  private clearComponentState() {
+    this.currentProgress.set(null);
+    this.result.set(null);
+    this.progressData = [];
   }
 
   private initializeSudokuVisualization() {
@@ -251,10 +274,10 @@ export class SudokuDemoComponent implements OnInit {
   }
 
   startSolving() {
-    this.result.set(null);
-    this.progressData = [];
+    this.clearComponentState();
     this.currentGrid = this.initialGrid.map(row => [...row]);
     this.initializeSudokuVisualization();
+    this.initializeProgressChart();
 
     this.solverService.solveSudoku(this.initialGrid, {
       populationSize: this.populationSize,
@@ -272,9 +295,7 @@ export class SudokuDemoComponent implements OnInit {
   }
 
   resetPuzzle() {
-    this.result.set(null);
-    this.currentProgress.set(null);
-    this.progressData = [];
+    this.clearComponentState();
     this.currentGrid = this.initialGrid.map(row => [...row]);
     this.initializeSudokuVisualization();
     this.initializeProgressChart();
