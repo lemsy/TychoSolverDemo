@@ -194,15 +194,12 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy {
                     this.currentProgress.set(progress);
                     this.updateChart(progress);
                     this.calculateImprovement(progress);
-                }
-            })
-        );
-
-        // Clear progress when solver service clears it
-        this.subscriptions.add(
-            this.solverService.progress$.subscribe(progress => {
-                if (progress === null) {
-                    this.clearProgress();
+                } else {
+                    // Only clear if this component was actually showing progress
+                    // This prevents clearing when switching between components
+                    if (this.currentProgress() !== null) {
+                        this.clearProgress();
+                    }
                 }
             })
         );

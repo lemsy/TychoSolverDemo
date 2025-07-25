@@ -35,10 +35,6 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   constructor(private solverService: SolverService) { }
 
   ngOnInit() {
-    // Clear any previous progress from other components
-    this.solverService.clearProgress();
-    this.clearComponentState();
-
     this.loadSpainCities();
     this.initializeTSPVisualization();
 
@@ -53,8 +49,6 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     // Clean up subscriptions
     this.subscriptions.unsubscribe();
-    // Clear progress when leaving this component
-    this.solverService.clearProgress();
   }
 
   private clearComponentState() {
@@ -162,6 +156,8 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   }
 
   startSolving() {
+    // Clear any previous progress
+    this.solverService.clearProgress();
     this.clearComponentState();
 
     // Calculate initial distance with random tour
