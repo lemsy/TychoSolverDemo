@@ -155,9 +155,9 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
   private progressChart: any;
 
   constructor(private solverService: SolverService) {
-    // Use effect to automatically react to current progress changes
+    // Use effect to automatically react to current progress changes based on type
     effect(() => {
-      const progress = this.solverService.progress();
+      const progress = this.solverService.getProgress(this.progressType)();
       if (progress) {
         this.currentProgress.set(progress);
         this.calculateImprovement(progress);
@@ -166,7 +166,7 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
 
     // Use effect to automatically react to progress history changes and update chart
     effect(() => {
-      const progressHistory = this.solverService.progressHistory();
+      const progressHistory = this.solverService.getProgressHistory(this.progressType)();
       this.renderChart(progressHistory);
     });
   }

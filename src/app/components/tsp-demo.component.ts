@@ -31,9 +31,9 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   private initialDistance = 0;
 
   constructor(private solverService: SolverService) {
-    // Use effect to automatically react to running state changes
+    // Use effect to automatically react to running state changes for TSP
     effect(() => {
-      this.isRunning.set(this.solverService.isRunning$());
+      this.isRunning.set(this.solverService.getIsRunning('tsp')());
     });
   }
 
@@ -152,7 +152,7 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
 
   startSolving() {
     // Clear any previous progress
-    this.solverService.clearProgress();
+    this.solverService.clearProgress('tsp');
     this.clearComponentState();
 
     // Calculate initial distance with random tour

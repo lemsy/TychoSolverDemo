@@ -32,14 +32,33 @@ export interface SudokuGrid extends Array<Array<number>> { }
     providedIn: 'root'
 })
 export class SolverService {
-    private progressSignal = signal<SolverProgress | null>(null);
-    public progress = this.progressSignal.asReadonly();
+    // Sudoku progress tracking
+    private sudokuProgressSignal = signal<SolverProgress | null>(null);
+    private sudokuProgressHistorySignal = signal<SolverProgress[]>([]);
+    private sudokuIsRunningSignal = signal<boolean>(false);
 
-    private progressHistorySignal = signal<SolverProgress[]>([]);
-    public progressHistory = this.progressHistorySignal.asReadonly();
+    // TSP progress tracking
+    private tspProgressSignal = signal<SolverProgress | null>(null);
+    private tspProgressHistorySignal = signal<SolverProgress[]>([]);
+    private tspIsRunningSignal = signal<boolean>(false);
 
-    private isRunningSignal = signal<boolean>(false);
-    public isRunning$ = this.isRunningSignal.asReadonly();
+    // Public readonly accessors for progress by type
+    public getProgress(type: 'sudoku' | 'tsp') {
+        return type === 'sudoku' ? this.sudokuProgressSignal.asReadonly() : this.tspProgressSignal.asReadonly();
+    }
+
+    public getProgressHistory(type: 'sudoku' | 'tsp') {
+        return type === 'sudoku' ? this.sudokuProgressHistorySignal.asReadonly() : this.tspProgressHistorySignal.asReadonly();
+    }
+
+    public getIsRunning(type: 'sudoku' | 'tsp') {
+        return type === 'sudoku' ? this.sudokuIsRunningSignal.asReadonly() : this.tspIsRunningSignal.asReadonly();
+    }
+
+    // Legacy getters for backward compatibility (will be removed)
+    public progress = this.sudokuProgressSignal.asReadonly();
+    public progressHistory = this.sudokuProgressHistorySignal.asReadonly();
+    public isRunning$ = this.sudokuIsRunningSignal.asReadonly();
 
     // Sudoku constants
     private readonly SUDOKU_SIZE = 9;
@@ -119,7 +138,7 @@ export class SolverService {
         } = {}
     ): Promise<SolverResult> {
         const startTime = performance.now();
-        this.isRunningSignal.set(true);
+        this.sudokuIsRunningSignal.set(true);
 
         const grid = initialGrid || this.copyGrid(this.DEFAULT_SUDOKU);
         const {
@@ -147,8 +166,8 @@ export class SolverService {
                 iteration: generation,
                 fitness: bestFitness
             };
-            this.progressSignal.set(initialProgress);
-            this.progressHistorySignal.update(history => [...history, initialProgress]);
+            this.sudokuProgressSignal.set(initialProgress);
+            this.sudokuProgressHistorySignal.update((history: SolverProgress[]) => [...history, initialProgress]);
 
             // Evolution loop
             for (generation = 0; generation < maxIterations; generation++) {
@@ -173,8 +192,8 @@ export class SolverService {
                     iteration: generation + 1,
                     fitness: bestFitness
                 };
-                this.progressSignal.set(progressUpdate);
-                this.progressHistorySignal.update(history => [...history, progressUpdate]);
+                this.sudokuProgressSignal.set(progressUpdate);
+                this.sudokuProgressHistorySignal.update((history: SolverProgress[]) => [...history, progressUpdate]);
 
                 // Check if solved
                 if (bestFitness >= this.SUDOKU_SIZE * 3) break;
@@ -236,8 +255,8 @@ export class SolverService {
                 iteration: generation,
                 fitness: bestFitness
             };
-            this.progressSignal.set(finalProgress);
-            this.progressHistorySignal.update(history => {
+            this.sudokuProgressSignal.set(finalProgress);
+            this.sudokuProgressHistorySignal.update((history: SolverProgress[]) => {
                 // Update the last entry or add a new one if needed
                 const lastEntry = history[history.length - 1];
                 if (lastEntry && lastEntry.iteration === generation) {
@@ -249,7 +268,7 @@ export class SolverService {
 
             return solverResult;
         } finally {
-            this.isRunningSignal.set(false);
+            this.sudokuIsRunningSignal.set(false);
         }
     }
 
@@ -318,7 +337,7 @@ export class SolverService {
         } = {}
     ): Promise<SolverResult> {
         const startTime = performance.now();
-        this.isRunningSignal.set(true);
+        this.sudokuIsRunningSignal.set(true);
 
         const grid = initialGrid || this.copyGrid(this.DEFAULT_SUDOKU);
         const {
@@ -340,8 +359,8 @@ export class SolverService {
                 iteration: 0,
                 fitness: bestFitnessFound
             };
-            this.progressSignal.set(initialProgress);
-            this.progressHistorySignal.update(history => [...history, initialProgress]);
+            this.sudokuProgressSignal.set(initialProgress);
+            this.sudokuProgressHistorySignal.update((history: SolverProgress[]) => [...history, initialProgress]);
 
             const result = await localSearch.search(
                 initialSolution,
@@ -360,8 +379,8 @@ export class SolverService {
                             iteration: iter,
                             fitness: bestFitnessFound
                         };
-                        this.progressSignal.set(progressUpdate);
-                        this.progressHistorySignal.update(history => [...history, progressUpdate]);
+                        this.sudokuProgressSignal.set(progressUpdate);
+                        this.sudokuProgressHistorySignal.update((history: SolverProgress[]) => [...history, progressUpdate]);
                     }
                 }
             );
@@ -380,8 +399,8 @@ export class SolverService {
                 iteration: result.iterations,
                 fitness: Math.max(bestFitnessFound, result.fitness)
             };
-            this.progressSignal.set(finalProgress);
-            this.progressHistorySignal.update(history => {
+            this.sudokuProgressSignal.set(finalProgress);
+            this.sudokuProgressHistorySignal.update((history: SolverProgress[]) => {
                 // Update the last entry or add a new one if needed
                 const lastEntry = history[history.length - 1];
                 if (lastEntry && lastEntry.iteration === result.iterations) {
@@ -393,7 +412,7 @@ export class SolverService {
 
             return solverResult;
         } finally {
-            this.isRunningSignal.set(false);
+            this.sudokuIsRunningSignal.set(false);
         }
     }
 
@@ -502,7 +521,7 @@ export class SolverService {
         } = {}
     ): Promise<SolverResult> {
         const startTime = performance.now();
-        this.isRunningSignal.set(true);
+        this.tspIsRunningSignal.set(true);
 
         const {
             maxIterations = 10000,
@@ -527,8 +546,8 @@ export class SolverService {
                 iteration: 0,
                 fitness: -bestFitness // Convert back to positive distance
             };
-            this.progressSignal.set(initialProgress);
-            this.progressHistorySignal.update(history => [...history, initialProgress]);
+            this.tspProgressSignal.set(initialProgress);
+            this.tspProgressHistorySignal.update((history: SolverProgress[]) => [...history, initialProgress]);
 
             const results = await parallelLocalSearch.search(
                 initialSolutions,
@@ -543,8 +562,8 @@ export class SolverService {
                             iteration,
                             fitness: -fitness // Convert back to positive distance
                         };
-                        this.progressSignal.set(progressUpdate);
-                        this.progressHistorySignal.update(history => [...history, progressUpdate]);
+                        this.tspProgressSignal.set(progressUpdate);
+                        this.tspProgressHistorySignal.update((history: SolverProgress[]) => [...history, progressUpdate]);
                     }
                 }
             );
@@ -568,8 +587,8 @@ export class SolverService {
                 iteration: bestResult.iterations,
                 fitness: -bestResult.fitness
             };
-            this.progressSignal.set(finalProgress);
-            this.progressHistorySignal.update(history => {
+            this.tspProgressSignal.set(finalProgress);
+            this.tspProgressHistorySignal.update((history: SolverProgress[]) => {
                 // Update the last entry or add a new one if needed
                 const lastEntry = history[history.length - 1];
                 if (lastEntry && lastEntry.iteration === bestResult.iterations) {
@@ -581,7 +600,7 @@ export class SolverService {
 
             return solverResult;
         } finally {
-            this.isRunningSignal.set(false);
+            this.tspIsRunningSignal.set(false);
         }
     }
 
@@ -595,7 +614,7 @@ export class SolverService {
         } = {}
     ): Promise<SolverResult> {
         const startTime = performance.now();
-        this.isRunningSignal.set(true);
+        this.tspIsRunningSignal.set(true);
 
         const { maxIterations = 10000 } = options;
 
@@ -614,8 +633,8 @@ export class SolverService {
                 iteration: 0,
                 fitness: -bestFitness // Convert back to positive distance
             };
-            this.progressSignal.set(initialProgress);
-            this.progressHistorySignal.update(history => [...history, initialProgress]);
+            this.tspProgressSignal.set(initialProgress);
+            this.tspProgressHistorySignal.update((history: SolverProgress[]) => [...history, initialProgress]);
 
             const result = await localSearch.search(
                 initialSolution,
@@ -630,8 +649,8 @@ export class SolverService {
                             iteration,
                             fitness: -fitness // Convert back to positive distance
                         };
-                        this.progressSignal.set(progressUpdate);
-                        this.progressHistorySignal.update(history => [...history, progressUpdate]);
+                        this.tspProgressSignal.set(progressUpdate);
+                        this.tspProgressHistorySignal.update((history: SolverProgress[]) => [...history, progressUpdate]);
                     }
                 }
             );
@@ -650,8 +669,8 @@ export class SolverService {
                 iteration: result.iterations,
                 fitness: -result.fitness
             };
-            this.progressSignal.set(finalProgress);
-            this.progressHistorySignal.update(history => {
+            this.tspProgressSignal.set(finalProgress);
+            this.tspProgressHistorySignal.update((history: SolverProgress[]) => {
                 // Update the last entry or add a new one if needed
                 const lastEntry = history[history.length - 1];
                 if (lastEntry && lastEntry.iteration === result.iterations) {
@@ -663,7 +682,7 @@ export class SolverService {
 
             return solverResult;
         } finally {
-            this.isRunningSignal.set(false);
+            this.tspIsRunningSignal.set(false);
         }
     }
 
@@ -799,20 +818,33 @@ export class SolverService {
     }
 
     /**
-     * Clears current progress and resets running state
-     * Should be called when switching between different solver types
+     * Clears progress for a specific solver type
      */
-    clearProgress(): void {
-        this.progressSignal.set(null);
-        this.progressHistorySignal.set([]);
-        this.isRunningSignal.set(false);
+    clearProgress(type: 'sudoku' | 'tsp'): void {
+        if (type === 'sudoku') {
+            this.sudokuProgressSignal.set(null);
+            this.sudokuProgressHistorySignal.set([]);
+            this.sudokuIsRunningSignal.set(false);
+        } else {
+            this.tspProgressSignal.set(null);
+            this.tspProgressHistorySignal.set([]);
+            this.tspIsRunningSignal.set(false);
+        }
     }
 
     /**
-     * Gets current running state
+     * Clears all progress data for all solver types
      */
-    isRunning(): boolean {
-        return this.isRunningSignal();
+    clearAllProgress(): void {
+        this.clearProgress('sudoku');
+        this.clearProgress('tsp');
+    }
+
+    /**
+     * Gets current running state for a specific solver type
+     */
+    isRunning(type: 'sudoku' | 'tsp'): boolean {
+        return type === 'sudoku' ? this.sudokuIsRunningSignal() : this.tspIsRunningSignal();
     }
 }
 

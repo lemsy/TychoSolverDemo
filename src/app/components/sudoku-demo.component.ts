@@ -40,9 +40,9 @@ export class SudokuDemoComponent implements OnInit, OnDestroy {
   private currentGrid = this.initialGrid.map(row => [...row]);
 
   constructor(private solverService: SolverService) {
-    // Use effect to automatically react to running state changes
+    // Use effect to automatically react to running state changes for Sudoku
     effect(() => {
-      this.isRunning.set(this.solverService.isRunning$());
+      this.isRunning.set(this.solverService.getIsRunning('sudoku')());
     });
   }
 
@@ -155,7 +155,7 @@ export class SudokuDemoComponent implements OnInit, OnDestroy {
 
   startSolving() {
     // Clear any previous progress
-    this.solverService.clearProgress();
+    this.solverService.clearProgress('sudoku');
     this.clearComponentState();
     this.currentGrid = this.initialGrid.map(row => [...row]);
     this.initializeSudokuVisualization();
@@ -177,7 +177,7 @@ export class SudokuDemoComponent implements OnInit, OnDestroy {
   }
 
   resetPuzzle() {
-    this.solverService.clearProgress();
+    this.solverService.clearProgress('sudoku');
     this.clearComponentState();
     this.currentGrid = this.initialGrid.map(row => [...row]);
     this.initializeSudokuVisualization();
