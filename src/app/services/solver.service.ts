@@ -4,6 +4,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 // Import Tycho solver components
 import {
     LocalSearch,
+    ParallelLocalSearch,
 } from 'tycho-solver';
 
 export interface SolverProgress {
@@ -472,9 +473,89 @@ export class SolverService {
     // TSP METHODS
 
     /**
-     * Solves TSP using Local Search
+     * Solves TSP using Parallel Local Search
      */
     async solveTSP(
+        cities: City[],
+        options: {
+            maxIterations?: number;
+            initialTemperature?: number;
+            numWorkers?: number;
+        } = {}
+    ): Promise<SolverResult> {
+        const startTime = performance.now();
+        this.isRunningSubject.next(true);
+
+        const {
+            maxIterations = 10000,
+            initialTemperature = 100,
+            numWorkers = 4
+        } = options;
+
+        try {
+            // Create multiple initial solutions for parallel search
+            const initialSolutions: number[][] = [];
+            for (let i = 0; i < numWorkers; i++) {
+                initialSolutions.push([...Array(cities.length).keys()].sort(() => Math.random() - 0.5));
+            }
+
+            // Setup Parallel Local Search
+            const parallelLocalSearch = new ParallelLocalSearch<number[]>();
+
+            let iteration = 0;
+            let bestFitness = -this.calculateTourDistance(initialSolutions[0], cities);
+
+            const results = await parallelLocalSearch.search(
+                initialSolutions,
+                (tour: number[]) => -this.calculateTourDistance(tour, cities), // Negative because we want to minimize distance
+                (tour: number[]) => this.tspNeighborhood(tour),
+                {
+                    maxIterations,
+                    maximize: true, // Maximize negative distance (minimize actual distance)
+                    onClimb: async (solution, fitness, iter) => {
+                        iteration = iter;
+                        this.progressSubject.next({
+                            iteration,
+                            currentFitness: -fitness, // Convert back to positive distance
+                            bestFitness: -fitness,
+                            isComplete: false
+                        });
+                    }
+                }
+            );
+
+            // Find the best result from all parallel searches
+            const bestResult = results.reduce((best, current) =>
+                current.fitness > best.fitness ? current : best
+            );
+
+            const endTime = performance.now();
+            const executionTime = endTime - startTime;
+
+            const solverResult: SolverResult = {
+                solution: bestResult.solution,
+                fitness: -bestResult.fitness, // Convert back to distance (positive)
+                iterations: bestResult.iterations,
+                executionTime
+            };
+
+            this.progressSubject.next({
+                iteration: bestResult.iterations,
+                currentFitness: -bestResult.fitness,
+                bestFitness: -bestResult.fitness,
+                isComplete: true
+            });
+
+            return solverResult;
+        } finally {
+            this.isRunningSubject.next(false);
+        }
+    }
+
+    /**
+     * Solves TSP using regular Local Search (single-threaded)
+     */
+    async solveTSPSingleThreaded(
         cities: City[],
         options: {
             maxIterations?: number;
@@ -495,7 +576,6 @@ export class SolverService {
 
             let iteration = 0;
             let bestFitness = -this.calculateTourDistance(initialSolution, cities);
-            let currentFitness = bestFitness;
 
             const result = await localSearch.search(
                 initialSolution,
