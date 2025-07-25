@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, OnInit, OnDestroy, OnChanges, ViewChild, signal, effect } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, OnDestroy, OnChanges, ViewChild, signal, effect, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import * as d3 from 'd3';
 import { SolverService, SolverProgress, SolverResult } from '../services/solver.service';
@@ -153,34 +153,51 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
 
   // Internal data - now reactive to progress history
   private progressChart: any;
+  private progressTypeSignal = signal<ProgressType>('sudoku');
+
+  // Computed signals based on progress type
+  private currentProgressFromService = computed(() => {
+    const type = this.progressTypeSignal();
+    return this.solverService.getProgress(type)();
+  });
+
+  private progressHistoryFromService = computed(() => {
+    const type = this.progressTypeSignal();
+    return this.solverService.getProgressHistory(type)();
+  });
 
   constructor(private solverService: SolverService) {
-    // Use effect to automatically react to current progress changes based on type
+    // Effect to sync current progress
     effect(() => {
-      const progress = this.solverService.getProgress(this.progressType)();
+      const progress = this.currentProgressFromService();
       if (progress) {
         this.currentProgress.set(progress);
         this.calculateImprovement(progress);
       }
     });
 
-    // Use effect to automatically react to progress history changes and update chart
+    // Effect to update chart when history changes
     effect(() => {
-      const progressHistory = this.solverService.getProgressHistory(this.progressType)();
+      const progressHistory = this.progressHistoryFromService();
       this.renderChart(progressHistory);
     });
   }
 
   ngOnInit() {
     this.initializeChart();
+    // Update the progress type signal to match the input
+    this.progressTypeSignal.set(this.progressType);
   }
 
   ngOnDestroy() {
-    // No longer needed since we're using effects instead of subscriptions
+    // Effects are automatically cleaned up
   }
 
   ngOnChanges() {
-    // This method is no longer needed since we're not using isActive
+    // Update the progress type signal when the input changes
+    if (this.progressType) {
+      this.progressTypeSignal.set(this.progressType);
+    }
   }
 
   /**
