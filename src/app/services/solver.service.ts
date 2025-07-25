@@ -3,15 +3,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 
 // Import Tycho solver components
 import {
-    GeneticAlgorithm,
     LocalSearch,
-    FitnessFunction,
-    EvolutionaryConfig,
-    Individual,
-    GeneGenerator,
-    SelectionMethod,
-    CrossoverMethod,
-    MutationMethod
 } from 'tycho-solver';
 
 export interface SolverProgress {
