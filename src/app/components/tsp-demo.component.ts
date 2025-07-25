@@ -4,16 +4,17 @@ import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import * as d3 from 'd3';
 import { SolverService, SolverProgress, SolverResult, City } from '../services/solver.service';
+import { OptimizationProgressComponent } from './optimization-progress.component';
 
 @Component({
   selector: 'app-tsp-demo',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, OptimizationProgressComponent],
   templateUrl: './tsp-demo.component.html',
   styleUrl: './tsp-demo.component.css'
 })
 export class TSPDemoComponent implements OnInit, OnDestroy {
   @ViewChild('tspMap', { static: true }) tspMapRef!: ElementRef;
-  @ViewChild('progressChart', { static: true }) progressChartRef!: ElementRef;
+  @ViewChild(OptimizationProgressComponent) progressComponent!: OptimizationProgressComponent;
 
   // Parameters
   maxIterations = 10000;
@@ -22,7 +23,6 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
 
   // State
   isRunning = signal(false);
-  currentProgress = signal<SolverProgress | null>(null);
   result = signal<SolverResult | null>(null);
 
   // Data
@@ -30,8 +30,6 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   private currentTour: number[] = [];
   private bestTour: number[] = [];
   private initialDistance = 0;
-  private progressData: { iteration: number; distance: number }[] = [];
-  private progressChart: any;
   private subscriptions = new Subscription();
 
   constructor(private solverService: SolverService) { }
@@ -43,19 +41,6 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
 
     this.loadSpainCities();
     this.initializeTSPVisualization();
-    this.initializeProgressChart();
-
-    // Subscribe to solver progress
-    this.subscriptions.add(
-      this.solverService.progress$.subscribe(progress => {
-        if (progress) {
-          this.currentProgress.set(progress);
-          this.updateProgressChart(progress);
-          // Note: We don't update visualization from progress as it doesn't contain the solution
-          // The solution will be updated when the solving is complete
-        }
-      })
-    );
 
     // Subscribe to solver running state
     this.subscriptions.add(
@@ -73,15 +58,12 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   }
 
   private clearComponentState() {
-    this.currentProgress.set(null);
     this.result.set(null);
-    this.progressData = [];
     this.currentTour = [];
     this.bestTour = [];
     this.initialDistance = 0;
-  }
-
-  loadSpainCities() {
+    this.progressComponent?.clearProgress();
+  } loadSpainCities() {
     this.cities = this.solverService.getSpainCities(this.numberOfCities);
     this.updateTSPVisualization();
   }
@@ -179,100 +161,6 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
     }
   }
 
-  private initializeProgressChart() {
-    const container = d3.select(this.progressChartRef.nativeElement);
-    container.selectAll('*').remove();
-
-    const margin = { top: 20, right: 30, bottom: 40, left: 60 };
-    const width = 300 - margin.left - margin.right;
-    const height = 180 - margin.top - margin.bottom;
-
-    const svg = container
-      .append('svg')
-      .attr('width', width + margin.left + margin.right)
-      .attr('height', height + margin.top + margin.bottom);
-
-    this.progressChart = svg
-      .append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`);
-
-    // Add axes
-    this.progressChart.append('g')
-      .attr('class', 'x-axis')
-      .attr('transform', `translate(0,${height})`);
-
-    this.progressChart.append('g')
-      .attr('class', 'y-axis');
-
-    // Add labels
-    svg.append('text')
-      .attr('x', width / 2 + margin.left)
-      .attr('y', height + margin.top + margin.bottom - 5)
-      .attr('text-anchor', 'middle')
-      .style('font-size', '12px')
-      .text('Iteration');
-
-    svg.append('text')
-      .attr('transform', 'rotate(-90)')
-      .attr('x', -(height / 2 + margin.top))
-      .attr('y', 15)
-      .attr('text-anchor', 'middle')
-      .style('font-size', '12px')
-      .text('Distance');
-  }
-
-  private updateProgressChart(progress: SolverProgress) {
-    this.progressData.push({
-      iteration: progress.iteration,
-      distance: -progress.bestFitness
-    });
-
-    // Keep only last 100 points for performance
-    if (this.progressData.length > 100) {
-      this.progressData = this.progressData.slice(-100);
-    }
-
-    const margin = { top: 20, right: 30, bottom: 40, left: 60 };
-    const width = 300 - margin.left - margin.right;
-    const height = 180 - margin.top - margin.bottom;
-
-    const xExtent = d3.extent(this.progressData, d => d.iteration) as [number, number];
-    const yExtent = d3.extent(this.progressData, d => d.distance) as [number, number];
-
-    const xScale = d3.scaleLinear()
-      .domain(xExtent)
-      .range([0, width]);
-
-    const yScale = d3.scaleLinear()
-      .domain(yExtent)
-      .range([height, 0]);
-
-    const line = d3.line<{ iteration: number; distance: number }>()
-      .x(d => xScale(d.iteration))
-      .y(d => yScale(d.distance))
-      .curve(d3.curveMonotoneX);
-
-    // Update axes
-    this.progressChart.select('.x-axis')
-      .call(d3.axisBottom(xScale).tickFormat(d3.format('d')));
-
-    this.progressChart.select('.y-axis')
-      .call(d3.axisLeft(yScale).tickFormat(d3.format('.1f')));
-
-    // Update line
-    const path = this.progressChart.selectAll('.progress-line')
-      .data([this.progressData]);
-
-    path.enter()
-      .append('path')
-      .attr('class', 'progress-line')
-      .attr('fill', 'none')
-      .attr('stroke', '#28a745')
-      .attr('stroke-width', 2)
-      .merge(path)
-      .attr('d', line);
-  }
-
   startSolving() {
     this.clearComponentState();
 
@@ -281,7 +169,9 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
     this.shuffleArray(initialTour);
     this.initialDistance = this.calculateDistance(initialTour);
     this.updateTSPVisualization(initialTour);
-    this.initializeProgressChart();
+
+    // Set initial distance for progress component
+    this.progressComponent?.setInitialValue(this.initialDistance);
 
     this.solverService.solveTSP(this.cities, {
       maxIterations: this.maxIterations,
@@ -289,6 +179,7 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
     }).then(result => {
       this.result.set(result);
       this.bestTour = result.solution;
+      this.progressComponent?.setResult(result);
       // Update the visualization with the final solution
       if (result.solution) {
         this.updateTSPVisualization(result.solution);
@@ -315,21 +206,5 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
       const j = Math.floor(Math.random() * (i + 1));
       [array[i], array[j]] = [array[j], array[i]];
     }
-  }
-
-  getImprovementPercentage(): number {
-    const progress = this.currentProgress();
-    if (!progress || this.initialDistance === 0) return 0;
-
-    const currentDistance = -progress.bestFitness;
-    return ((this.initialDistance - currentDistance) / this.initialDistance) * 100;
-  }
-
-  getFinalImprovementPercentage(): number {
-    const result = this.result();
-    if (!result || this.initialDistance === 0) return 0;
-
-    const finalDistance = -result.fitness;
-    return ((this.initialDistance - finalDistance) / this.initialDistance) * 100;
   }
 }

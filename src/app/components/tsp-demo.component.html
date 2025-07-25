@@ -47,36 +47,16 @@
             </div>
         </div>
 
-        <!-- TSP Visualization -->
-        <div class="tsp-container">
-            <div class="tsp-map" #tspMap></div>
-        </div>
-
-        <!-- Progress Chart -->
-        <div class="progress-container">
-            <h3>Optimization Progress</h3>
-            <div class="chart" #progressChart></div>
-
-            @if (currentProgress()) {
-            <div class="progress-info">
-                <div class="progress-item">
-                    <span class="label">Iteration:</span>
-                    <span class="value">{{currentProgress()?.iteration}}</span>
-                </div>
-                <div class="progress-item">
-                    <span class="label">Current Distance:</span>
-                    <span class="value">{{(currentProgress()?.currentFitness || 0).toFixed(1)}}</span>
-                </div>
-                <div class="progress-item">
-                    <span class="label">Best Distance:</span>
-                    <span class="value">{{(currentProgress()?.bestFitness || 0).toFixed(1)}}</span>
-                </div>
-                <div class="progress-item">
-                    <span class="label">Improvement:</span>
-                    <span class="value">{{getImprovementPercentage().toFixed(1)}}%</span>
-                </div>
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- TSP Visualization -->
+            <div class="tsp-container">
+                <div class="tsp-map" #tspMap></div>
             </div>
-            }
+
+            <!-- Progress Component -->
+            <app-optimization-progress progressType="tsp">
+            </app-optimization-progress>
         </div>
     </div>
 
@@ -87,19 +67,7 @@
         <div class="result-stats">
             <div class="stat">
                 <span class="label">Final Distance:</span>
-                <span class="value">{{(result()?.fitness || 0).toFixed(1)}}</span>
-            </div>
-            <div class="stat">
-                <span class="label">Iterations:</span>
-                <span class="value">{{result()?.iterations}}</span>
-            </div>
-            <div class="stat">
-                <span class="label">Execution Time:</span>
-                <span class="value">{{result()?.executionTime}}ms</span>
-            </div>
-            <div class="stat">
-                <span class="label">Improvement:</span>
-                <span class="value">{{getFinalImprovementPercentage().toFixed(1)}}%</span>
+                <span class="value">{{(-(result()?.fitness ?? 0)).toFixed(1)}}</span>
             </div>
         </div>
     </div>

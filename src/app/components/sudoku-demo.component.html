@@ -33,36 +33,16 @@
             </div>
         </div>
 
-        <!-- Sudoku Grid -->
-        <div class="sudoku-container">
-            <div class="sudoku-grid" #sudokuGrid></div>
-        </div>
-
-        <!-- Progress Chart -->
-        <div class="progress-container">
-            <h3>Evolution Progress</h3>
-            <div class="chart" #progressChart></div>
-
-            @if (currentProgress()) {
-            <div class="progress-info">
-                <div class="progress-item">
-                    <span class="label">Iteration:</span>
-                    <span class="value">{{currentProgress()?.iteration}}</span>
-                </div>
-                <div class="progress-item">
-                    <span class="label">Current Fitness:</span>
-                    <span class="value">{{currentProgress()?.currentFitness}}</span>
-                </div>
-                <div class="progress-item">
-                    <span class="label">Best Fitness:</span>
-                    <span class="value">{{currentProgress()?.bestFitness}}</span>
-                </div>
-                <div class="progress-item">
-                    <span class="label">Progress:</span>
-                    <span class="value">{{((currentProgress()?.bestFitness || 0) / 243 * 100).toFixed(1)}}%</span>
-                </div>
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sudoku Grid -->
+            <div class="sudoku-container">
+                <div class="sudoku-grid" #sudokuGrid></div>
             </div>
-            }
+
+            <!-- Progress Component -->
+            <app-optimization-progress progressType="sudoku">
+            </app-optimization-progress>
         </div>
     </div>
 
@@ -71,18 +51,6 @@
     <div class="results">
         <h3>Solution Found!</h3>
         <div class="result-stats">
-            <div class="stat">
-                <span class="label">Final Fitness:</span>
-                <span class="value">{{result()?.fitness}}</span>
-            </div>
-            <div class="stat">
-                <span class="label">Iterations:</span>
-                <span class="value">{{result()?.iterations}}</span>
-            </div>
-            <div class="stat">
-                <span class="label">Execution Time:</span>
-                <span class="value">{{result()?.executionTime}}ms</span>
-            </div>
             <div class="stat">
                 <span class="label">Success Rate:</span>
                 <span class="value">{{((result()?.fitness || 0) / 243 * 100).toFixed(1)}}%</span>
