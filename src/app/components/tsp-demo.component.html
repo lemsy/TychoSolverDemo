@@ -1,0 +1,107 @@
+<div class="tsp-demo">
+    <h2>Traveling Salesman Problem (TSP) Demo</h2>
+    <p>Watch as simulated annealing finds the shortest route through Spanish cities!</p>
+
+    <div class="demo-container">
+        <!-- Controls -->
+        <div class="controls">
+            <div class="parameter-group">
+                <label>Max Iterations:</label>
+                <input type="number" [(ngModel)]="maxIterations" [disabled]="isRunning()" min="1000" max="50000"
+                    step="1000">
+            </div>
+
+            <div class="parameter-group">
+                <label>Parallel Workers:</label>
+                <select [(ngModel)]="numWorkers" [disabled]="isRunning()">
+                    <option value="1">1 Worker</option>
+                    <option value="2">2 Workers</option>
+                    <option value="4">4 Workers</option>
+                    <option value="6">6 Workers</option>
+                    <option value="8">8 Workers</option>
+                </select>
+            </div>
+
+            <div class="parameter-group">
+                <label>Number of Cities:</label>
+                <select [(ngModel)]="numberOfCities" [disabled]="isRunning()" (change)="updateCities()">
+                    <option value="10">10 Cities</option>
+                    <option value="20">20 Cities</option>
+                    <option value="30">30 Cities</option>
+                    <option value="40">40 Cities</option>
+                </select>
+            </div>
+
+            <div class="button-group">
+                <button (click)="startSolving()" [disabled]="isRunning()" class="btn-primary">
+                    {{isRunning() ? 'Optimizing...' : 'Start Optimization'}}
+                </button>
+
+                <button (click)="generateNewCities()" [disabled]="isRunning()" class="btn-secondary">
+                    New Random Cities
+                </button>
+
+                <button (click)="loadSpainCities()" [disabled]="isRunning()" class="btn-secondary">
+                    Load Spain Cities
+                </button>
+            </div>
+        </div>
+
+        <!-- TSP Visualization -->
+        <div class="tsp-container">
+            <div class="tsp-map" #tspMap></div>
+        </div>
+
+        <!-- Progress Chart -->
+        <div class="progress-container">
+            <h3>Optimization Progress</h3>
+            <div class="chart" #progressChart></div>
+
+            @if (currentProgress()) {
+            <div class="progress-info">
+                <div class="progress-item">
+                    <span class="label">Iteration:</span>
+                    <span class="value">{{currentProgress()?.iteration}}</span>
+                </div>
+                <div class="progress-item">
+                    <span class="label">Current Distance:</span>
+                    <span class="value">{{(currentProgress()?.currentFitness || 0).toFixed(1)}}</span>
+                </div>
+                <div class="progress-item">
+                    <span class="label">Best Distance:</span>
+                    <span class="value">{{(currentProgress()?.bestFitness || 0).toFixed(1)}}</span>
+                </div>
+                <div class="progress-item">
+                    <span class="label">Improvement:</span>
+                    <span class="value">{{getImprovementPercentage().toFixed(1)}}%</span>
+                </div>
+            </div>
+            }
+        </div>
+    </div>
+
+    <!-- Results -->
+    @if (result()) {
+    <div class="results">
+        <h3>Optimization Complete!</h3>
+        <div class="result-stats">
+            <div class="stat">
+                <span class="label">Final Distance:</span>
+                <span class="value">{{(result()?.fitness || 0).toFixed(1)}}</span>
+            </div>
+            <div class="stat">
+                <span class="label">Iterations:</span>
+                <span class="value">{{result()?.iterations}}</span>
+            </div>
+            <div class="stat">
+                <span class="label">Execution Time:</span>
+                <span class="value">{{result()?.executionTime}}ms</span>
+            </div>
+            <div class="stat">
+                <span class="label">Improvement:</span>
+                <span class="value">{{getFinalImprovementPercentage().toFixed(1)}}%</span>
+            </div>
+        </div>
+    </div>
+    }
+</div>
