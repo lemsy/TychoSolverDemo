@@ -3,16 +3,16 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 
 @Component({
-    selector: 'app-home',
-    imports: [CommonModule, RouterModule],
-    template: `
+  selector: 'app-home',
+  imports: [CommonModule, RouterModule],
+  template: `
     <div class="home">
       <header class="hero">
         <h1>Tycho Solver Demo</h1>
         <p class="subtitle">Interactive Metaheuristic Algorithm Demonstrations</p>
         <p class="description">
           Explore the power of metaheuristic algorithms through interactive browser-based demos. 
-          Watch as genetic algorithms and simulated annealing solve complex optimization problems in real-time.
+          Watch as local search algorithms solve complex optimization problems in real-time.
         </p>
       </header>
 
@@ -24,13 +24,13 @@ import { RouterModule } from '@angular/router';
             <div class="demo-icon">🧩</div>
             <h3>Sudoku Solver</h3>
             <p>
-              Watch a genetic algorithm evolve a population of candidate solutions 
-              to solve a challenging 9x9 Sudoku puzzle. Visualize the evolution 
-              process and fitness improvement over generations.
+              Watch a local search algorithm iteratively improve candidate solutions 
+              to solve a challenging 9x9 Sudoku puzzle. Visualize the search process 
+              and fitness improvement in real-time.
             </p>
             <div class="demo-features">
-              <span class="feature">Genetic Algorithm</span>
-              <span class="feature">Real-time Evolution</span>
+              <span class="feature">Local Search</span>
+              <span class="feature">Real-time Search</span>
               <span class="feature">D3.js Visualization</span>
             </div>
             <a routerLink="/sudoku" class="demo-button">Try Sudoku Demo</a>
@@ -40,12 +40,12 @@ import { RouterModule } from '@angular/router';
             <div class="demo-icon">🗺️</div>
             <h3>Traveling Salesman Problem</h3>
             <p>
-              Experience simulated annealing as it finds the shortest route through 
-              Spanish cities. Watch the algorithm escape local optima and converge 
+              Experience parallel local search as it finds the shortest route through 
+              Spanish cities. Watch the algorithm explore neighborhoods and converge 
               to near-optimal solutions.
             </p>
             <div class="demo-features">
-              <span class="feature">Simulated Annealing</span>
+              <span class="feature">Parallel Local Search</span>
               <span class="feature">Interactive Map</span>
               <span class="feature">Real Cities Data</span>
             </div>
@@ -66,7 +66,7 @@ import { RouterModule } from '@angular/router';
             
             <h3>Key Features</h3>
             <ul>
-              <li><strong>Multiple Algorithms:</strong> Genetic Algorithm, Simulated Annealing, Parallel Local Search</li>
+              <li><strong>Multiple Algorithms:</strong> Local Search, Parallel Local Search</li>
               <li><strong>Browser Compatible:</strong> Run optimization algorithms directly in the browser</li>
               <li><strong>TypeScript Support:</strong> Full type safety and modern development experience</li>
               <li><strong>Flexible Architecture:</strong> Easy to extend and customize for specific problems</li>
@@ -126,7 +126,7 @@ import { RouterModule } from '@angular/router';
       </section>
     </div>
   `,
-    styles: [`
+  styles: [`
     .home {
       min-height: 100vh;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
