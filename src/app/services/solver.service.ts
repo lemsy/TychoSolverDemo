@@ -539,28 +539,28 @@ export class SolverService {
             const parallelLocalSearch = new ParallelLocalSearch<number[]>();
 
             let iteration = 0;
-            let bestFitness = -this.calculateTourDistance(initialSolutions[0], cities);
+            let bestFitness = this.calculateTourDistance(initialSolutions[0], cities);
 
             // Report initial progress
             const initialProgress = {
                 iteration: 0,
-                fitness: -bestFitness // Convert back to positive distance
+                fitness: bestFitness
             };
             this.tspProgressSignal.set(initialProgress);
             this.tspProgressHistorySignal.update((history: SolverProgress[]) => [...history, initialProgress]);
 
             const results = await parallelLocalSearch.search(
                 initialSolutions,
-                (tour: number[]) => -this.calculateTourDistance(tour, cities), // Negative because we want to minimize distance
+                (tour: number[]) => this.calculateTourDistance(tour, cities), // Minimize distance
                 (tour: number[]) => this.tspNeighborhood(tour),
                 {
                     maxIterations,
-                    maximize: true, // Maximize negative distance (minimize actual distance)
+                    maximize: false, // Minimize distance
                     onClimb: async (solution, fitness, iter) => {
                         iteration = iter;
                         const progressUpdate = {
                             iteration,
-                            fitness: -fitness // Convert back to positive distance
+                            fitness: fitness // Already positive distance
                         };
                         this.tspProgressSignal.set(progressUpdate);
                         this.tspProgressHistorySignal.update((history: SolverProgress[]) => [...history, progressUpdate]);
@@ -570,7 +570,7 @@ export class SolverService {
 
             // Find the best result from all parallel searches
             const bestResult = results.reduce((best, current) =>
-                current.fitness > best.fitness ? current : best
+                current.fitness < best.fitness ? current : best
             );
 
             const endTime = performance.now();
@@ -578,14 +578,14 @@ export class SolverService {
 
             const solverResult: SolverResult = {
                 solution: bestResult.solution,
-                fitness: -bestResult.fitness, // Convert back to distance (positive)
+                fitness: bestResult.fitness, // Already positive distance
                 iterations: bestResult.iterations,
                 executionTime
             };
 
             const finalProgress = {
                 iteration: bestResult.iterations,
-                fitness: -bestResult.fitness
+                fitness: bestResult.fitness
             };
             this.tspProgressSignal.set(finalProgress);
             this.tspProgressHistorySignal.update((history: SolverProgress[]) => {

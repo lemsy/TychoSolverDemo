@@ -221,7 +221,7 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
 
   private calculateImprovement(progress: SolverProgress) {
     if (this.progressType === 'tsp' && this.initialValue) {
-      const currentValue = -progress.fitness; // TSP fitness is negative distance
+      const currentValue = progress.fitness; // TSP fitness is positive distance
       const improvementPercent = ((this.initialValue - currentValue) / this.initialValue) * 100;
       this.improvement.set(Math.max(0, improvementPercent));
     }
@@ -341,8 +341,8 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
     if (this.progressType === 'sudoku') {
       return fitness.toString();
     } else {
-      // For TSP, convert negative fitness back to positive distance
-      return (-fitness).toFixed(1);
+      // For TSP, fitness is already positive distance
+      return fitness.toFixed(1);
     }
   }
 
@@ -353,7 +353,7 @@ export class OptimizationProgressComponent implements OnInit, OnDestroy, OnChang
     this.result.set(result);
 
     if (this.progressType === 'tsp' && this.initialValue) {
-      const finalValue = -result.fitness;
+      const finalValue = result.fitness;
       const improvementPercent = ((this.initialValue - finalValue) / this.initialValue) * 100;
       this.finalImprovement.set(Math.max(0, improvementPercent));
     }
