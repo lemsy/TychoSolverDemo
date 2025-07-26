@@ -16,7 +16,6 @@ export class SudokuDemoComponent implements OnInit, OnDestroy {
   @ViewChild(OptimizationProgressComponent) progressComponent!: OptimizationProgressComponent;
 
   // Parameters
-  populationSize = 50;
   maxIterations = 1000;
   mutationRate = 0.1;
 
@@ -161,7 +160,6 @@ export class SudokuDemoComponent implements OnInit, OnDestroy {
     this.initializeSudokuVisualization();
 
     this.solverService.solveSudoku(this.initialGrid, {
-      populationSize: this.populationSize,
       maxIterations: this.maxIterations,
       mutationRate: this.mutationRate
     }).then(result => {
