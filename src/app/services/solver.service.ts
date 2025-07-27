@@ -1,5 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { RouteDistanceService } from './route-distance.service';
+import { of } from 'rxjs';
 
 // Import Tycho solver components
 import {
@@ -343,7 +344,8 @@ export class SolverService {
             const parallelLocalSearch = new ParallelLocalSearch<number[]>();
 
             let iteration = 0;
-            let bestFitness = this.calculateTourDistance(initialSolutions[0], cities);
+            // Use async real driving distance for initial fitness
+            let bestFitness = await this.calculateTourDistanceAsync(initialSolutions[0], cities);
 
             // Report initial progress
             const initialProgress = {
@@ -355,7 +357,7 @@ export class SolverService {
 
             const results = await parallelLocalSearch.search(
                 initialSolutions,
-                (tour: number[]) => this.calculateTourDistance(tour, cities), // Minimize distance
+                (tour: number[]) => this.calculateTourDistanceAsync(tour, cities), // Minimize real driving distance
                 (tour: number[]) => this.tspNeighborhood(tour),
                 {
                     maxIterations,
@@ -430,9 +432,7 @@ export class SolverService {
         for (let i = 0; i < tour.length; i++) {
             const from = cities[tour[i]];
             const to = cities[tour[(i + 1) % tour.length]];
-            totalDistance += await new Promise<number>(resolve => {
-                this.getDistance(from, to).subscribe(resolve);
-            });
+            totalDistance += await this.getDistance(from, to);
         }
         return totalDistance;
     }
@@ -459,20 +459,18 @@ export class SolverService {
      * Calculates real driving distance between two cities if lat/lon available, else Euclidean
      * Returns an Observable<number> (meters)
      */
-    public getDistance(city1: City, city2: City) {
+    public async getDistance(city1: City, city2: City): Promise<number> {
         if (city1.lat != null && city1.lon != null && city2.lat != null && city2.lon != null) {
-            return this.routeDistanceService.getDrivingDistance(
+            const result = await this.routeDistanceService.getDrivingDistance(
                 { lat: city1.lat, lon: city1.lon },
                 { lat: city2.lat, lon: city2.lon }
-            );
-        } else {
-            // Fallback to Euclidean
-            const dx = city1.x - city2.x;
-            const dy = city1.y - city2.y;
-            return {
-                subscribe: (cb: (d: number) => void) => { cb(Math.sqrt(dx * dx + dy * dy)); }
-            };
+            ).toPromise();
+            return result ?? 0;
         }
+        // Fallback to Euclidean
+        const dx = city1.x - city2.x;
+        const dy = city1.y - city2.y;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     /**

@@ -128,9 +128,7 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
     for (let i = 0; i < tour.length; i++) {
       const current = this.cities[tour[i]];
       const next = this.cities[tour[(i + 1) % tour.length]];
-      distance += await new Promise<number>(resolve => {
-        this.solverService.getDistance(current, next).subscribe(resolve);
-      });
+      distance += await this.solverService.getDistance(current, next);
     }
     return distance;
   }

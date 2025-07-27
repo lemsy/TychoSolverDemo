@@ -1,13 +1,15 @@
+
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
-import { Observable, of, from, Subject } from 'rxjs';
+import { Observable, of, from, Subject, forkJoin } from 'rxjs';
 import { map, catchError, shareReplay, concatMap } from 'rxjs/operators';
 
 export interface LatLng {
     lat: number;
     lon: number;
 }
+
 
 @Injectable({ providedIn: 'root' })
 export class RouteDistanceService {
@@ -51,5 +53,21 @@ export class RouteDistanceService {
         }).pipe(shareReplay(1));
         this.cache.set(key, obs);
         return obs;
+    }
+
+    /**
+     * Prefetch and cache all pairwise driving distances for a list of cities (with lat/lon)
+     * Returns an Observable that completes when all requests are done
+     */
+    prefetchAllDistances(cities: Array<{ lat: number, lon: number }>): Observable<any> {
+        const pairs: Observable<number>[] = [];
+        for (let i = 0; i < cities.length; i++) {
+            for (let j = 0; j < cities.length; j++) {
+                if (i !== j) {
+                    pairs.push(this.getDrivingDistance(cities[i], cities[j]));
+                }
+            }
+        }
+        return forkJoin(pairs);
     }
 }
