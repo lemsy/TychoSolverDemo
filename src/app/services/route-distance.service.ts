@@ -43,7 +43,11 @@ export class RouteDistanceService {
             this.requestQueue.next(() => {
                 const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${this.apiKey}&start=${from.lon},${from.lat}&end=${to.lon},${to.lat}`;
                 this.http.get<any>(url).pipe(
-                    map(res => res.routes?.[0]?.summary?.distance ?? Infinity),
+                    map(res => {
+                        // Correct extraction for OpenRouteService v2 response
+                        // res.features[0].properties.summary.distance
+                        return res?.features?.[0]?.properties?.summary?.distance ?? Infinity;
+                    }),
                     catchError(() => of(Infinity))
                 ).subscribe({
                     next: value => resolver && resolver(value),
