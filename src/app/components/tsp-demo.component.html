@@ -24,12 +24,8 @@
 
             <div class="parameter-group">
                 <label>Number of Cities:</label>
-                <select [(ngModel)]="numberOfCities" [disabled]="isRunning()" (change)="updateCities()">
+                <select [(ngModel)]="numberOfCities" disabled>
                     <option value="5">5 Cities (default)</option>
-                    <option value="10">10 Cities</option>
-                    <option value="20">20 Cities</option>
-                    <option value="30">30 Cities</option>
-                    <option value="40">40 Cities</option>
                 </select>
             </div>
 

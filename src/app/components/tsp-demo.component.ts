@@ -56,7 +56,10 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   }
 
   loadSpainCities() {
-    this.cities = this.solverService.getSpainCities(this.numberOfCities);
+    // Get all cities, shuffle, and pick 5 at random
+    const allCities = this.solverService.getSpainCities();
+    const shuffled = allCities.sort(() => Math.random() - 0.5);
+    this.cities = shuffled.slice(0, 5);
     this.result.set(null); // Reset result so map clears tour
     this.progressComponent?.clearProgress(); // Also clear progress chart
     this.showLabels = false;
