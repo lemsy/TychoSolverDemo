@@ -1,18 +1,20 @@
 import { Component, ElementRef, OnInit, OnDestroy, ViewChild, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import * as d3 from 'd3';
+// import * as d3 from 'd3';
 import { SolverService, SolverProgress, SolverResult, City } from '../services/solver.service';
 import { OptimizationProgressComponent } from './optimization-progress.component';
+import { TSPMapComponent } from './tsp-map.component';
 
 @Component({
   selector: 'app-tsp-demo',
-  imports: [CommonModule, FormsModule, OptimizationProgressComponent],
+  imports: [CommonModule, FormsModule, OptimizationProgressComponent, TSPMapComponent],
   templateUrl: './tsp-demo.component.html',
   styleUrl: './tsp-demo.component.css'
 })
 export class TSPDemoComponent implements OnInit, OnDestroy {
-  @ViewChild('tspMap', { static: true }) tspMapRef!: ElementRef;
+  public showLabels = false;
+  // @ViewChild('tspMap', { static: true }) tspMapRef!: ElementRef;
   @ViewChild(OptimizationProgressComponent) progressComponent!: OptimizationProgressComponent;
 
   // Parameters
@@ -26,8 +28,9 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
 
   // Data
   private cities: City[] = [];
-  private currentTour: number[] = [];
-  private bestTour: number[] = [];
+  public get bestTour(): number[] {
+    return this.result()?.solution ?? [];
+  }
   private initialDistance = 0;
 
   constructor(private solverService: SolverService) {
@@ -39,7 +42,7 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.loadSpainCities();
-    this.initializeTSPVisualization();
+    // this.initializeTSPVisualization();
   }
 
   ngOnDestroy() {
@@ -48,106 +51,38 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
 
   private clearComponentState() {
     this.result.set(null);
-    this.currentTour = [];
-    this.bestTour = [];
     this.initialDistance = 0;
     this.progressComponent?.clearProgress();
-  } loadSpainCities() {
-    this.cities = this.solverService.getSpainCities(this.numberOfCities);
-    this.updateTSPVisualization();
   }
 
-  generateNewCities() {
-    this.cities = this.solverService.generateRandomCities(this.numberOfCities, 700, 450);
-    this.updateTSPVisualization();
+  loadSpainCities() {
+    this.cities = this.solverService.getSpainCities(this.numberOfCities);
+    this.result.set(null); // Reset result so map clears tour
+    this.progressComponent?.clearProgress(); // Also clear progress chart
+    this.showLabels = false;
   }
+
+
 
   updateCities() {
-    // Always load Spain cities when the number changes
-    // The user can use "New Random Cities" if they want random ones
-    this.loadSpainCities();
+    // Only update cities if the number of cities actually changed
+    if (this.cities.length !== this.numberOfCities) {
+      this.loadSpainCities();
+    }
   }
 
-  private initializeTSPVisualization() {
-    const container = d3.select(this.tspMapRef.nativeElement);
-    container.selectAll('*').remove();
-
-    const width = 800;
-    const height = 550;
-
-    const svg = container
-      .append('svg')
-      .attr('width', width)
-      .attr('height', height);
-
-    this.updateTSPVisualization();
-  }
-
-  private updateTSPVisualization(tour?: number[]) {
-    const container = d3.select(this.tspMapRef.nativeElement);
-    const svg = container.select('svg');
-
-    if (svg.empty()) return;
-
-    svg.selectAll('*').remove();
-
-    const width = 800;
-    const height = 550;
-
-    // Draw tour path
-    if (tour && tour.length > 0) {
-      const pathData = tour.map(i => this.cities[i])
-        .concat([this.cities[tour[0]]]); // Close the loop
-
-      const line = d3.line<City>()
-        .x(d => d.x)
-        .y(d => d.y);
-
-      svg.append('path')
-        .datum(pathData)
-        .attr('d', line)
-        .attr('stroke', '#007acc')
-        .attr('stroke-width', 2)
-        .attr('fill', 'none');
-    }
-
-    // Draw cities
-    svg.selectAll('.city')
-      .data(this.cities)
-      .enter()
-      .append('circle')
-      .attr('class', 'city')
-      .attr('cx', d => d.x)
-      .attr('cy', d => d.y)
-      .attr('r', 6)
-      .attr('fill', '#ff6b6b')
-      .attr('stroke', '#333')
-      .attr('stroke-width', 1);
-
-    // Draw city labels
-    svg.selectAll('.city-label')
-      .data(this.cities)
-      .enter()
-      .append('text')
-      .attr('class', 'city-label')
-      .attr('x', d => d.x)
-      .attr('y', d => d.y - 10)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '10px')
-      .attr('font-weight', 'bold')
-      .attr('fill', '#333')
-      .text(d => d.name);
-
-    // Highlight start city
-    if (tour && tour.length > 0) {
-      svg.append('circle')
-        .attr('cx', this.cities[tour[0]].x)
-        .attr('cy', this.cities[tour[0]].y)
-        .attr('r', 8)
-        .attr('fill', 'none')
-        .attr('stroke', '#28a745')
-        .attr('stroke-width', 3);
-    }
+  // Leaflet expects {name, lat, lng}
+  get leafletCities() {
+    return this.cities.map(city => {
+      // Prefer lat/lon if present, else fallback to y/x (for random cities)
+      const lat = typeof (city as any).lat === 'number' ? (city as any).lat : city.y;
+      const lng = typeof (city as any).lon === 'number' ? (city as any).lon : city.x;
+      return {
+        name: city.name,
+        lat,
+        lng
+      };
+    });
   }
 
   startSolving() {
@@ -164,7 +99,7 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
     const initialTour = [...Array(this.cities.length).keys()];
     this.shuffleArray(initialTour);
     this.initialDistance = this.calculateDistance(initialTour);
-    this.updateTSPVisualization(initialTour);
+    // this.updateTSPVisualization(initialTour);
 
     // Set initial distance for improvement calculations
     this.progressComponent?.setInitialValue(this.initialDistance);
@@ -174,12 +109,11 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
       numWorkers: this.numWorkers
     }).then(result => {
       this.result.set(result);
-      this.bestTour = result.solution;
       this.progressComponent?.setResult(result);
       // Update the visualization with the final solution
-      if (result.solution) {
-        this.updateTSPVisualization(result.solution);
-      }
+      // if (result.solution) {
+      //   this.updateTSPVisualization(result.solution);
+      // }
     }).catch(error => {
       console.error('Solving failed:', error);
     });

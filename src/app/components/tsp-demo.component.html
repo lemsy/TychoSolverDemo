@@ -37,9 +37,7 @@
                     {{isRunning() ? 'Optimizing...' : 'Start Optimization'}}
                 </button>
 
-                <button (click)="generateNewCities()" [disabled]="isRunning()" class="btn-secondary">
-                    New Random Cities
-                </button>
+
 
                 <button (click)="loadSpainCities()" [disabled]="isRunning()" class="btn-secondary">
                     Load Spain Cities
@@ -49,9 +47,9 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- TSP Visualization -->
+            <!-- TSP Visualization: Leaflet Map -->
             <div class="tsp-container">
-                <div class="tsp-map" #tspMap></div>
+                <app-tsp-map [cities]="leafletCities" [tour]="bestTour" [showLabels]="showLabels"></app-tsp-map>
             </div>
 
             <!-- Progress Component -->

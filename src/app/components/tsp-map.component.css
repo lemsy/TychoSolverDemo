@@ -1,0 +1,19 @@
+.tsp-map-container {
+    background: #f8d7da !important;
+    border: 2px dashed #d9534f !important;
+}
+
+.tsp-map-container {
+    width: 100%;
+    height: 550px;
+    position: relative;
+}
+
+.leaflet-container {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    min-width: 0 !important;
+    border: none !important;
+    background: none !important;
+}
