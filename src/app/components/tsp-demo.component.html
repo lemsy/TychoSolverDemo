@@ -1,3 +1,19 @@
+<!-- Error Modal -->
+<div *ngIf="showErrorModal" class="modal-backdrop">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Error</h3>
+            </div>
+            <div class="modal-body">
+                <p>{{errorMessage}}</p>
+            </div>
+            <div class="modal-footer">
+                <button (click)="closeErrorModal()" class="btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="tsp-demo">
     <h2>Traveling Salesman Problem (TSP) Demo</h2>
     <p>Watch as local search finds the shortest route through Spanish cities!</p>

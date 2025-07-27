@@ -13,6 +13,20 @@ import { TSPMapComponent } from './tsp-map.component';
   styleUrl: './tsp-demo.component.css'
 })
 export class TSPDemoComponent implements OnInit, OnDestroy {
+  // Error modal state
+  showErrorModal = false;
+  errorMessage = '';
+
+  public showBlockingError(message: string) {
+    this.errorMessage = message;
+    this.showErrorModal = true;
+    this.clearComponentState();
+    this.isRunning.set(false);
+  }
+
+  closeErrorModal() {
+    this.showErrorModal = false;
+  }
   public showLabels = false;
   // @ViewChild('tspMap', { static: true }) tspMapRef!: ElementRef;
   @ViewChild(OptimizationProgressComponent) progressComponent!: OptimizationProgressComponent;

@@ -48,7 +48,23 @@ export class RouteDistanceService {
                         // res.features[0].properties.summary.distance
                         return res?.features?.[0]?.properties?.summary?.distance ?? Infinity;
                     }),
-                    catchError(() => of(Infinity))
+                    catchError((err) => {
+                        this.cache.clear();
+                        this.requestQueue.complete();
+                        // Try to show a nice modal if TSPDemoComponent is present
+                        const root = window as any;
+                        if (root && root.ng && root.ng.getComponent) {
+                            // Try to find the TSPDemoComponent instance
+                            const el = document.querySelector('app-tsp-demo');
+                            if (el) {
+                                const cmp = root.ng.getComponent(el);
+                                if (cmp && typeof cmp.showBlockingError === 'function') {
+                                    cmp.showBlockingError('Please wait 1 minute to try again, due to too many requests to the open service.');
+                                }
+                            }
+                        }
+                        return of(Infinity);
+                    })
                 ).subscribe({
                     next: value => resolver && resolver(value),
                     error: () => resolver && resolver(Infinity)
