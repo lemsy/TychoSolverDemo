@@ -410,15 +410,6 @@ export class SolverService {
         }
     }
 
-    /**
-     * Creates a TSP instance from cities
-     */
-    private createTSPInstance(cities: City[]) {
-        return {
-            cities,
-            evaluate: (tour: number[]) => this.calculateTourDistance(tour, cities)
-        };
-    }
 
     /**
      * Calculates total distance of a tour
@@ -438,26 +429,7 @@ export class SolverService {
     }
 
     /**
-     * Calculates total distance of a tour (Euclidean, sync, fallback)
-     */
-    private calculateTourDistance(tour: number[], cities: City[]): number {
-        let totalDistance = 0;
-        for (let i = 0; i < tour.length; i++) {
-            const from = cities[tour[i]];
-            const to = cities[tour[(i + 1) % tour.length]];
-            const dx = from.x - to.x;
-            const dy = from.y - to.y;
-            totalDistance += Math.sqrt(dx * dx + dy * dy);
-        }
-        return totalDistance;
-    }
-
-    /**
-     * Calculates Euclidean distance between two cities
-     */
-    /**
      * Calculates real driving distance between two cities if lat/lon available, else Euclidean
-     * Returns an Observable<number> (meters)
      */
     public async getDistance(city1: City, city2: City): Promise<number> {
         if (city1.lat != null && city1.lon != null && city2.lat != null && city2.lon != null) {

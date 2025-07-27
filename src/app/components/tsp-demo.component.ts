@@ -20,7 +20,7 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
   // Parameters
   maxIterations = 10000;
   numWorkers = 4;
-  numberOfCities = 20;
+  numberOfCities = 5;
 
   // State
   isRunning = signal(false);
