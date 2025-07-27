@@ -98,7 +98,10 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
     // Calculate initial distance with random tour
     const initialTour = [...Array(this.cities.length).keys()];
     this.shuffleArray(initialTour);
-    this.initialDistance = this.calculateDistance(initialTour);
+    this.calculateDistance(initialTour).then(dist => {
+      this.initialDistance = dist;
+      this.progressComponent?.setInitialValue(this.initialDistance);
+    });
     // this.updateTSPVisualization(initialTour);
 
     // Set initial distance for improvement calculations
@@ -119,14 +122,15 @@ export class TSPDemoComponent implements OnInit, OnDestroy {
     });
   }
 
-  private calculateDistance(tour: number[]): number {
+  // Calculates total tour distance using real driving distances if available
+  private async calculateDistance(tour: number[]): Promise<number> {
     let distance = 0;
     for (let i = 0; i < tour.length; i++) {
       const current = this.cities[tour[i]];
       const next = this.cities[tour[(i + 1) % tour.length]];
-      distance += Math.sqrt(
-        Math.pow(current.x - next.x, 2) + Math.pow(current.y - next.y, 2)
-      );
+      distance += await new Promise<number>(resolve => {
+        this.solverService.getDistance(current, next).subscribe(resolve);
+      });
     }
     return distance;
   }

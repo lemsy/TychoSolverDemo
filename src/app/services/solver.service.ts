@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { RouteDistanceService } from './route-distance.service';
 
 // Import Tycho solver components
 import {
@@ -32,6 +33,7 @@ export interface SudokuGrid extends Array<Array<number>> { }
     providedIn: 'root'
 })
 export class SolverService {
+    private routeDistanceService = inject(RouteDistanceService);
     // Sudoku progress tracking
     private sudokuProgressSignal = signal<SolverProgress | null>(null);
     private sudokuProgressHistorySignal = signal<SolverProgress[]>([]);
@@ -419,12 +421,33 @@ export class SolverService {
     /**
      * Calculates total distance of a tour
      */
+
+    /**
+     * Calculates total distance of a tour (async, uses real driving distance if available)
+     */
+    public async calculateTourDistanceAsync(tour: number[], cities: City[]): Promise<number> {
+        let totalDistance = 0;
+        for (let i = 0; i < tour.length; i++) {
+            const from = cities[tour[i]];
+            const to = cities[tour[(i + 1) % tour.length]];
+            totalDistance += await new Promise<number>(resolve => {
+                this.getDistance(from, to).subscribe(resolve);
+            });
+        }
+        return totalDistance;
+    }
+
+    /**
+     * Calculates total distance of a tour (Euclidean, sync, fallback)
+     */
     private calculateTourDistance(tour: number[], cities: City[]): number {
         let totalDistance = 0;
         for (let i = 0; i < tour.length; i++) {
             const from = cities[tour[i]];
             const to = cities[tour[(i + 1) % tour.length]];
-            totalDistance += this.calculateDistance(from, to);
+            const dx = from.x - to.x;
+            const dy = from.y - to.y;
+            totalDistance += Math.sqrt(dx * dx + dy * dy);
         }
         return totalDistance;
     }
@@ -432,10 +455,24 @@ export class SolverService {
     /**
      * Calculates Euclidean distance between two cities
      */
-    private calculateDistance(city1: City, city2: City): number {
-        const dx = city1.x - city2.x;
-        const dy = city1.y - city2.y;
-        return Math.sqrt(dx * dx + dy * dy);
+    /**
+     * Calculates real driving distance between two cities if lat/lon available, else Euclidean
+     * Returns an Observable<number> (meters)
+     */
+    public getDistance(city1: City, city2: City) {
+        if (city1.lat != null && city1.lon != null && city2.lat != null && city2.lon != null) {
+            return this.routeDistanceService.getDrivingDistance(
+                { lat: city1.lat, lon: city1.lon },
+                { lat: city2.lat, lon: city2.lon }
+            );
+        } else {
+            // Fallback to Euclidean
+            const dx = city1.x - city2.x;
+            const dy = city1.y - city2.y;
+            return {
+                subscribe: (cb: (d: number) => void) => { cb(Math.sqrt(dx * dx + dy * dy)); }
+            };
+        }
     }
 
     /**
