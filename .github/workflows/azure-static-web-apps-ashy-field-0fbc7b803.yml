@@ -23,6 +23,9 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '22'
+      - name: Inject API Key into environment.prod.ts
+        run: |
+          sed -i "s/openRouteServiceApiKey: ''/openRouteServiceApiKey: '${{ secrets.OPEN_ROUTE_SERVICE_API_KEY }}'/g" src/environments/environment.prod.ts
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
