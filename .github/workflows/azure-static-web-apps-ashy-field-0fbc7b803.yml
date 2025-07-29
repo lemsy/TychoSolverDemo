@@ -26,6 +26,8 @@ jobs:
       - name: Inject API Key into environment.prod.ts
         run: |
           sed -i "s/openRouteServiceApiKey: ''/openRouteServiceApiKey: '${{ secrets.OPEN_ROUTE_SERVICE_API_KEY }}'/g" src/environments/environment.prod.ts
+      - name: Build Angular app (production)
+        run: npm run build -- --configuration production
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
